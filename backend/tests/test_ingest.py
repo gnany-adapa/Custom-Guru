@@ -6,6 +6,7 @@ proxy and writes a temporary Chroma store, so the proxy must be running.
 from __future__ import annotations
 
 import chromadb
+import pytest
 
 from backend.app.rag.ingest import chunk_text, clean_text, ingest
 
@@ -52,3 +53,21 @@ def test_ingest_builds_persistent_collection(tmp_path):
     # Metadata records which file each chunk came from.
     sample = col.get(limit=1, include=["metadatas"])
     assert sample["metadatas"][0]["source"] in {"talk1.txt", "talk2.txt"}
+
+
+@pytest.mark.parametrize("chunk_size,overlap", [(40, 40), (40, 50), (0, 0)])
+def test_chunk_text_rejects_bad_overlap(chunk_size, overlap):
+    with pytest.raises(ValueError):
+        chunk_text("some words here to split", chunk_size_words=chunk_size, overlap_words=overlap)
+
+
+def test_ingest_rejects_transcripts_with_no_usable_text(tmp_path):
+    tdir = tmp_path / "transcripts"
+    tdir.mkdir()
+    (tdir / "blank.txt").write_text("   \n\n\t  ")  # whitespace only
+    with pytest.raises(ValueError, match="no usable text"):
+        ingest(
+            transcripts_dir=str(tdir),
+            chroma_dir=str(tmp_path / "chroma"),
+            collection_name="blankpersona",
+        )

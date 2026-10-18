@@ -29,6 +29,11 @@ def chunk_text(text: str, chunk_size_words: int, overlap_words: int) -> list[str
 
     Overlap keeps ideas that straddle a boundary retrievable from either chunk.
     """
+    if chunk_size_words <= 0:
+        raise ValueError("chunk_size_words must be positive")
+    if not 0 <= overlap_words < chunk_size_words:
+        raise ValueError("overlap_words must satisfy 0 <= overlap_words < chunk_size_words")
+
     words = text.split()
     if not words:
         return []
@@ -81,6 +86,11 @@ def ingest(
             documents.append(chunk)
             metadatas.append({"source": source, "chunk": i})
             ids.append(f"{source}-{i}")
+
+    if not documents:
+        raise ValueError(
+            f"Transcripts in {transcripts_dir} contained no usable text after cleaning."
+        )
 
     embeddings = _embed_all(provider, documents)
 
