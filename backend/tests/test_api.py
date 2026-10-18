@@ -45,11 +45,12 @@ def test_chat_maps_provider_failure_to_503(monkeypatch):
 
 
 def test_chat_success_passes_through(monkeypatch):
-    monkeypatch.setattr(
-        main_module,
-        "answer",
-        lambda _q: {"answer": "A", "covered": True, "sources": ["talk.txt"]},
-    )
+    payload = {
+        "answer": "A [1]",
+        "covered": True,
+        "citations": [{"n": 1, "source": "talk.txt", "excerpt": "…"}],
+    }
+    monkeypatch.setattr(main_module, "answer", lambda _q: payload)
     r = client.post("/chat", json={"question": "hello"})
     assert r.status_code == 200
-    assert r.json() == {"answer": "A", "covered": True, "sources": ["talk.txt"]}
+    assert r.json() == payload

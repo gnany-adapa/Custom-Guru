@@ -54,7 +54,7 @@ def test_low_match_uses_fallback_llm_not_canned_refusal(tmp_path):
     )
 
     assert result["covered"] is False
-    assert result["sources"] == []
+    assert result["citations"] == []
     assert spy.generate_called is True  # hybrid: the LLM is consulted on a low match
     assert result["answer"] == "FALLBACK_REPLY"
     # ...and it was handed the fallback prompt, not the grounded one.

@@ -30,4 +30,5 @@ def test_answer_covered_question_is_grounded(tmp_path):
 
     assert result["covered"] is True
     assert isinstance(result["answer"], str) and result["answer"].strip() != ""
-    assert "delegation.txt" in result["sources"]
+    # Any citation the model emits must point at the only transcript we ingested.
+    assert all(c["source"] == "delegation.txt" for c in result["citations"])

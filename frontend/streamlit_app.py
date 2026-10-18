@@ -164,8 +164,8 @@ span.material-symbols-outlined,
 [data-testid="stChatMessageAvatarUser"] { background: var(--ink); }
 [data-testid="stChatMessageAvatarUser"] svg { fill: #fff; color: #fff; }
 
-.cg-sources { font-size: .78rem; color: var(--muted); margin-top: .5rem;
-  padding-top: .5rem; border-top: 1px solid var(--line); }
+.cg-cite { font-size: .85rem; color: var(--muted); font-style: italic;
+  border-left: 2px solid var(--line); padding-left: .7rem; margin: .15rem 0 .7rem; }
 
 /* ---------------- Input pill ---------------- */
 [data-testid="stBottomBlockContainer"] { max-width: 760px; margin: 0 auto; }
@@ -205,7 +205,7 @@ def ask_backend(question: str) -> dict:
         data = r.json()
         return {
             "answer": data["answer"],
-            "sources": data.get("sources", []) if data.get("covered") else [],
+            "citations": data.get("citations", []) if data.get("covered") else [],
         }
     except requests.RequestException as exc:
         return {
@@ -213,7 +213,7 @@ def ask_backend(question: str) -> dict:
                 f"Can't reach the backend at `{BACKEND_URL}`. "
                 f"Start it with `uvicorn backend.app.main:app`, then try again.\n\n`{exc}`"
             ),
-            "sources": [],
+            "citations": [],
         }
 
 
@@ -255,16 +255,18 @@ with st.sidebar:
     )
 
 
-def render_message(role: str, content: str, sources: list[str] | None = None) -> None:
+def render_message(role: str, content: str, citations: list[dict] | None = None) -> None:
     avatar = "🧠" if role == "assistant" else "🧑"
     with st.chat_message(role, avatar=avatar):
         st.markdown(content)
-        if sources:
-            st.markdown(
-                f'<div class="cg-sources">From {PERSONA_NAME}’s talks: '
-                f'{", ".join(sources)}</div>',
-                unsafe_allow_html=True,
-            )
+        if citations:
+            with st.expander(f"Sources ({len(citations)})"):
+                for c in citations:
+                    st.markdown(f"**[{c['n']}]**  `{c['source']}`")
+                    st.markdown(
+                        f'<div class="cg-cite">{c["excerpt"]}</div>',
+                        unsafe_allow_html=True,
+                    )
 
 
 # --------------------------------------------------------------------------- main
@@ -289,7 +291,7 @@ if show_greeting:
 
 # Replay the conversation so far.
 for msg in st.session_state.messages:
-    render_message(msg["role"], msg["content"], msg.get("sources"))
+    render_message(msg["role"], msg["content"], msg.get("citations"))
 
 # Handle a new question (from the input box or a starter chip).
 if prompt:
@@ -297,9 +299,9 @@ if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.spinner("Thinking…"):
         result = ask_backend(prompt)
-    render_message("assistant", result["answer"], result["sources"])
+    render_message("assistant", result["answer"], result["citations"])
     st.session_state.messages.append(
-        {"role": "assistant", "content": result["answer"], "sources": result["sources"]}
+        {"role": "assistant", "content": result["answer"], "citations": result["citations"]}
     )
     if show_greeting:
         st.rerun()
