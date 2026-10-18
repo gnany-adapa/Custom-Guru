@@ -46,11 +46,40 @@ streamlit run frontend/streamlit_app.py # start the UI
 Place plain-text files under `data/personas/<name>/transcripts/`. This folder is
 gitignored — your data never gets committed.
 
-## Default provider: Hyperspace
+## Using a different LLM provider
 
-v1 defaults to a local Hyperspace proxy so there's no cloud cost while developing. To use a
-different provider, implement a new adapter under `backend/app/llm/` and set
-`LLM_PROVIDER` in `.env`.
+The app never calls a vendor SDK directly. It depends on one small interface,
+`LLMProvider` ([`backend/app/llm/base.py`](backend/app/llm/base.py)), with just two methods:
+
+```python
+def generate(self, messages, system=None, max_tokens=1000) -> str   # chat completion
+def embed(self, texts) -> list[list[float]]                         # embeddings
+```
+
+v1 defaults to a local **Hyperspace** proxy (`LLM_PROVIDER=hyperspace`) so there's no cloud
+cost while developing. To plug in a different provider — OpenAI, Anthropic, Gemini, a local
+model, anything — you write one adapter; no other code changes.
+
+**Steps to add a provider (e.g. `openai`):**
+
+1. Copy [`backend/app/llm/provider_template.py`](backend/app/llm/provider_template.py) to a
+   new file, e.g. `backend/app/llm/openai_provider.py`.
+2. Implement `generate()` and `embed()` using your provider's API or SDK. Translate *to and
+   from* the neutral types in the signatures — the rest of the app only sees those.
+3. Register the class in [`backend/app/llm/factory.py`](backend/app/llm/factory.py):
+   ```python
+   _PROVIDERS = {
+       "hyperspace": HyperspaceProvider,
+       "openai": OpenAIProvider,   # <- your new adapter
+   }
+   ```
+4. Set `LLM_PROVIDER=openai` (and your keys) in `.env`. Done.
+
+[`hyperspace.py`](backend/app/llm/hyperspace.py) is a complete worked example to copy from.
+
+> Note: `LLMProvider` currently bundles chat **and** embeddings into one provider. If you
+> want chat from one vendor and embeddings from another, that split is planned for a later
+> version — for now a single adapter handles both.
 
 ## License
 
