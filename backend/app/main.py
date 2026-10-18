@@ -1,20 +1,30 @@
 """Custom Guru FastAPI application.
 
-v1 exposes a health check now; the /chat endpoint is added in a later milestone.
+Exposes a health check and the grounded persona chat endpoint.
 """
 from __future__ import annotations
 
-from fastapi import FastAPI
-from pydantic import BaseModel
+import requests
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field, field_validator
 
 from backend.app.chat.service import answer
 from backend.app.config import settings
+from backend.app.rag.retriever import VectorStoreNotFoundError
 
 app = FastAPI(title="Custom Guru", version="0.1.0")
 
 
 class ChatRequest(BaseModel):
-    question: str
+    question: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("question")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("question must not be blank")
+        return cleaned
 
 
 @app.get("/health")
@@ -26,4 +36,12 @@ def health() -> dict:
 @app.post("/chat")
 def chat(req: ChatRequest) -> dict:
     """Answer a question as the configured persona, grounded in their transcripts."""
-    return answer(req.question)
+    try:
+        return answer(req.question)
+    except VectorStoreNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except requests.RequestException as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="LLM provider unavailable. Is the Hyperspace proxy running?",
+        ) from exc
