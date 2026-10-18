@@ -295,16 +295,9 @@ for msg in st.session_state.messages:
 if prompt:
     render_message("user", prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("assistant", avatar="🧠"):
-        with st.spinner("Thinking…"):
-            result = ask_backend(prompt)
-        st.markdown(result["answer"])
-        if result["sources"]:
-            st.markdown(
-                f'<div class="cg-sources">From {PERSONA_NAME}’s talks: '
-                f'{", ".join(result["sources"])}</div>',
-                unsafe_allow_html=True,
-            )
+    with st.spinner("Thinking…"):
+        result = ask_backend(prompt)
+    render_message("assistant", result["answer"], result["sources"])
     st.session_state.messages.append(
         {"role": "assistant", "content": result["answer"], "sources": result["sources"]}
     )
