@@ -25,3 +25,7 @@ env/
 .DS_Store
 .idea/
 .vscode/
+
+# --- Local verification artifacts ---
+.playwright-mcp/
+customguru-v1-demo.png
