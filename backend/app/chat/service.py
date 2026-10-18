@@ -4,16 +4,8 @@ from __future__ import annotations
 from backend.app.config import settings
 from backend.app.llm.base import LLMProvider
 from backend.app.llm.factory import get_provider
-from backend.app.persona.prompts import build_system_prompt
+from backend.app.persona.prompts import build_fallback_prompt, build_system_prompt
 from backend.app.rag.retriever import retrieve
-
-# Returned verbatim (in persona voice) when nothing relevant is retrieved, so the avatar
-# declines instead of inventing advice.
-_NOT_COVERED = (
-    "Honestly, I haven't talked about that one. I'm not going to make something up just "
-    "to give you an answer — that's how people end up with bad advice. Ask me about "
-    "something I've actually covered and I'll give it to you straight."
-)
 
 
 def answer(
@@ -27,8 +19,9 @@ def answer(
 ) -> dict:
     """Answer `question` as the persona, grounded in retrieved transcript chunks.
 
-    If the nearest chunk is farther than `threshold` (cosine distance), the question is
-    treated as uncovered: the avatar declines and no LLM call is made.
+    If the nearest chunk is farther than `threshold` (cosine distance), there's no
+    relevant material: the model is instead given a fallback prompt so it can greet
+    small talk warmly or decline a genuine off-topic question — without inventing advice.
 
     Returns {"answer": str, "covered": bool, "sources": list[str]}.
     """
@@ -42,16 +35,22 @@ def answer(
         provider=provider,
     )
 
-    # Grounded guard: refuse when nothing retrieved is close enough.
-    if not hits or hits[0]["distance"] > threshold:
-        return {"answer": _NOT_COVERED, "covered": False, "sources": []}
+    grounded = bool(hits) and hits[0]["distance"] <= threshold
+    if grounded:
+        system = build_system_prompt(hits)
+        reply = provider.generate(
+            messages=[{"role": "user", "content": question}],
+            system=system,
+            max_tokens=max_tokens,
+        )
+        # De-duplicate sources while preserving retrieval order.
+        sources = list(dict.fromkeys(h["source"] for h in hits))
+        return {"answer": reply, "covered": True, "sources": sources}
 
-    system = build_system_prompt(hits)
+    # No relevant material: let the model greet small talk or decline, via the fallback.
     reply = provider.generate(
         messages=[{"role": "user", "content": question}],
-        system=system,
-        max_tokens=max_tokens,
+        system=build_fallback_prompt(),
+        max_tokens=300,
     )
-    # De-duplicate sources while preserving retrieval order.
-    sources = list(dict.fromkeys(h["source"] for h in hits))
-    return {"answer": reply, "covered": True, "sources": sources}
+    return {"answer": reply, "covered": False, "sources": []}

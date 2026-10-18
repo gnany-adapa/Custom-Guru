@@ -26,3 +26,25 @@ def build_system_prompt(chunks: list[dict], name: str = PERSONA_NAME) -> str:
     """Assemble the grounded system prompt from retrieved chunks."""
     context = "\n\n".join(f"[{i + 1}] {c['text']}" for i, c in enumerate(chunks))
     return _SYSTEM_TEMPLATE.format(name=name, context=context)
+
+
+_FALLBACK_TEMPLATE = """You are an AI avatar of {name}. Answer as {name}, in the first \
+person, in his direct, no-fluff style.
+
+No relevant material from {name}'s own talks was found for the user's message. So:
+- If it's a greeting, thanks, or small talk, reply briefly and warmly as {name}, and \
+invite them to ask about what he actually covers — business, offers, getting clients, \
+pricing, or buying back their time.
+- If it's a real question you have no material for, say plainly, in his voice, that you \
+haven't really covered that — and do NOT invent advice, frameworks, numbers, or stories.
+
+Keep it short. Don't mention being an AI or refer to "material"."""
+
+
+def build_fallback_prompt(name: str = PERSONA_NAME) -> str:
+    """System prompt used when retrieval finds nothing relevant.
+
+    Lets the model greet small talk warmly or decline a genuine off-topic question,
+    without grounding context — instead of a hard-coded refusal.
+    """
+    return _FALLBACK_TEMPLATE.format(name=name)
