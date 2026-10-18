@@ -29,3 +29,4 @@ env/
 # --- Local verification artifacts ---
 .playwright-mcp/
 customguru-v1-demo.png
+cg-*.png
