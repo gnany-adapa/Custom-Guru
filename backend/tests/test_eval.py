@@ -1,0 +1,64 @@
+"""Offline unit tests for the eval harness: aggregation, behavior check, judge parsing."""
+from __future__ import annotations
+
+from backend.app.eval.judge import judge_answer
+from backend.app.eval.runner import aggregate, behavior_ok, run_eval
+from backend.app.llm.base import LLMProvider, Message
+
+
+def test_behavior_ok_by_kind():
+    assert behavior_ok("off_topic", covered=False) is True
+    assert behavior_ok("off_topic", covered=True) is False
+    assert behavior_ok("covered", covered=True) is True
+    assert behavior_ok("novel", covered=False) is False
+    assert behavior_ok("small_talk", covered=True) is None  # not scored
+
+
+def test_aggregate_means_and_pass_rate():
+    results = [
+        {"kind": "covered", "covered": True, "scores": {"groundedness": 4, "voice": 2, "transparency": 4}},
+        {"kind": "novel", "covered": True, "scores": {"groundedness": 2, "voice": 4, "transparency": 2}},
+    ]
+    agg = aggregate(results)
+    assert agg["groundedness"] == 3.0
+    assert agg["voice"] == 3.0
+    assert agg["transparency"] == 3.0
+    assert agg["behavior_pass_rate"] == 1.0
+    assert agg["n"] == 2
+
+
+def test_run_eval_with_fakes():
+    qs = [
+        {"id": "a", "kind": "covered", "question": "q1"},
+        {"id": "b", "kind": "off_topic", "question": "q2"},
+    ]
+
+    def fake_answer(q):
+        return {"answer": "A", "covered": q == "q1", "citations": []}
+
+    def fake_judge(question, answer, citations, provider):
+        return {"groundedness": 4, "voice": 4, "transparency": 4}
+
+    report = run_eval(fake_answer, fake_judge, questions=qs, provider=None)
+    assert len(report["results"]) == 2
+    assert report["aggregates"]["groundedness"] == 4.0
+    assert report["aggregates"]["behavior_pass_rate"] == 1.0  # covered→True, off_topic→False both correct
+
+
+class _FakeJudgeProvider(LLMProvider):
+    def __init__(self, reply: str) -> None:
+        self.reply = reply
+
+    def generate(self, messages: list[Message], system: str | None = None, max_tokens: int = 1000) -> str:
+        return self.reply
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        raise AssertionError("judge does not embed")
+
+
+def test_judge_answer_parses_scores():
+    fp = _FakeJudgeProvider('Sure: {"groundedness": 4, "voice": 5, "transparency": 3, "note": "solid"}')
+    out = judge_answer("q", "ans", [{"excerpt": "x", "source": "a.txt"}], fp)
+    assert out["groundedness"] == 4
+    assert out["voice"] == 5
+    assert out["transparency"] == 3

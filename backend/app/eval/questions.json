@@ -1,0 +1,17 @@
+{
+  "description": "Evaluation questions for Custom Guru. 'kind' sets the expected behavior: covered=answer grounded in transcripts; novel=reason/extrapolate from principles (he never addressed it directly); off_topic=should decline; small_talk=should greet, not refuse.",
+  "questions": [
+    { "id": "cov-pricing-new-offer", "kind": "covered", "question": "How should I price a brand-new offer that has no track record yet?" },
+    { "id": "cov-time-allocation", "kind": "covered", "question": "How do I decide what to actually spend my time on as a founder?" },
+    { "id": "cov-hook", "kind": "covered", "question": "How do I write a hook that actually grabs attention?" },
+    { "id": "cov-get-clients", "kind": "covered", "question": "What's the fastest way to get more clients when I'm starting out?" },
+    { "id": "nov-mealprep-app", "kind": "novel", "question": "Should I launch a $5/month budget meal-prep subscription app?" },
+    { "id": "nov-ai-sales-team", "kind": "novel", "question": "Would you replace your sales team with AI agents?" },
+    { "id": "nov-newsletter-vs-youtube", "kind": "novel", "question": "As a solo creator with no audience, should I start a paid newsletter or a YouTube channel first?" },
+    { "id": "nov-saas-lifetime-deal", "kind": "novel", "question": "Should a early-stage SaaS startup offer a lifetime deal to get traction?" },
+    { "id": "off-carbonara", "kind": "off_topic", "question": "What's a good recipe for pasta carbonara?" },
+    { "id": "off-sprained-ankle", "kind": "off_topic", "question": "How do I treat a sprained ankle at home?" },
+    { "id": "small-greeting", "kind": "small_talk", "question": "Hey Alex, how's it going?" },
+    { "id": "small-identity", "kind": "small_talk", "question": "Who are you?" }
+  ]
+}
