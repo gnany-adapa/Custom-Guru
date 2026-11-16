@@ -1,86 +1,104 @@
 # Custom Guru 🧠
 
-**Chat with an AI avatar of a thought leader that answers from their *actual* recorded words — not generic impersonation.**
+**An open-source engine for *grounded, auditable* AI personas — it answers *as* a person
+using their own recorded words, and is honest about the difference between what they
+actually said and what it's reasoning on their behalf.**
 
-Custom Guru is an open-source template. You bring your own transcripts (talks,
-interviews, writings) for any persona you like; the app grounds every answer in that
-source material and replies in the persona's voice. Ships with **zero persona data** — it's
-the engine, not someone's scraped life.
+Most "chat with X" / persona bots optimize for *sounding* like someone. They can't tell you
+what's a real quote versus an invention, and you can't inspect how they reached an answer.
+Custom Guru treats this as a **provenance and reasoning-transparency problem**: every claim
+is either tied to a **source quote that's been verified to actually exist**, or clearly
+**labelled as extrapolation** — never blurred. Bring your own corpus (talks, essays, docs);
+the engine ships with **zero persona data**.
 
-> **v1 status:** "Grounded Hormozi" — single persona, chat interface, answers only from the
-> transcripts you provide. Reasoning traces, citations, multiple personas, and a
-> multi-agent "board of directors" are planned for later versions.
+## What makes it different
+- **Verified grounding, not vibes.** When the persona answers from the corpus, each cited
+  quote is checked to *literally occur* in the source — fabricated or paraphrased citations
+  are dropped, not shown. (`_quote_supported`, `_apply_citations`.)
+- **Distilled principles, not just chunks.** An offline pipeline distills a corpus into a
+  small, inspectable set of **durable principles**, each backed by verified quotes
+  (`principles.json`) — a model of *how the person thinks*, not just a search index.
+- **Honest about extrapolation.** For questions the person never addressed, the goal is to
+  reason *from their own principles* with a transparent **premise → principle → conclusion**
+  trace, explicitly marked as a reasoned hypothesis — not passed off as fact.
+- **Provider-agnostic & self-hostable.** One `LLMProvider` interface; swap OpenAI / Anthropic
+  / a local model / a proxy with an env var. No vendor lock-in.
 
----
+## Status (honest)
+**Available now:** grounded Q&A in the persona's voice · verified inline citations ·
+principle-extraction pipeline (map → consolidate → compress) · honest fallback for
+out-of-corpus questions · an evaluation harness (groundedness / voice / transparency) ·
+optional Langfuse tracing · a Streamlit demo UI.
+
+**In progress (the headline):** the **principle-based reasoning engine** — answering novel
+questions by applying the extracted principles with a visible, source-traceable trace and a
+critic that checks faithfulness. This is the active area of work; today the system *grounds
+or honestly declines*, and the reasoning layer is being built on top of the principle store.
 
 ## Architecture
-
 ```
-Streamlit UI  ──HTTP──▶  FastAPI backend
-                              │
-                 ┌────────────┼─────────────┐
-                 ▼            ▼              ▼
-            Retriever    Persona prompt   LLMProvider (adapter)
-             (Chroma)                      └─ Hyperspace (default)
-                                           └─ OpenAI / Claude / … (pluggable)
+Streamlit UI ──HTTP──▶ FastAPI backend
+                          │
+        ┌─────────────────┼───────────────────┐
+        ▼                 ▼                     ▼
+   Retriever        Principle store        LLMProvider (adapter)
+   (Chroma)         (quote-verified)        ├─ Hyperspace (default)
+        │                 │                 └─ OpenAI / Claude / local (pluggable)
+        └──────▶ Chat service: ground (cited) · reason-from-principles (traced) · decline
 ```
-
-- **Provider-agnostic LLM layer** — the app talks to one `LLMProvider` interface, never a
-  vendor SDK directly. Swap providers with an env var.
-- **Grounded-only** — retrieves relevant transcript chunks and answers from them; if
-  nothing relevant is found, the avatar says it hasn't covered that topic.
 
 ## Quick start
-
 ```bash
 pip install -r requirements.txt
-cp .env.example .env          # then fill in your keys
-# drop 3-4 .txt transcripts into data/personas/hormozi/transcripts/
-python -m backend.app.rag.ingest        # build the vector store
-uvicorn backend.app.main:app --reload   # start the API
-streamlit run frontend/streamlit_app.py # start the UI
+cp .env.example .env            # fill in your LLM provider keys
+# drop plain-text source files into data/personas/<name>/transcripts/
+python -m backend.app.rag.ingest       # build the retrieval store
+python -m backend.app.rag.principles   # distill the principle set (principles.json)
+uvicorn backend.app.main:app --reload  # start the API
+streamlit run frontend/streamlit_app.py
 ```
 
-## Bring your own transcripts
-
-Place plain-text files under `data/personas/<name>/transcripts/`. This folder is
-gitignored — your data never gets committed.
+## Bring your own corpus
+Place plain-text files under `data/personas/<name>/transcripts/` (gitignored — your data is
+never committed), set `PERSONA` in `.env`, and re-run the two pipeline steps above. The demo
+ships with no persona's content.
 
 ## Using a different LLM provider
-
-The app never calls a vendor SDK directly. It depends on one small interface,
-`LLMProvider` ([`backend/app/llm/base.py`](backend/app/llm/base.py)), with just two methods:
+The app never calls a vendor SDK directly — it depends on one small interface,
+`LLMProvider` ([`backend/app/llm/base.py`](backend/app/llm/base.py)):
 
 ```python
 def generate(self, messages, system=None, max_tokens=1000) -> str   # chat completion
 def embed(self, texts) -> list[list[float]]                         # embeddings
 ```
 
-v1 defaults to a local **Hyperspace** proxy (`LLM_PROVIDER=hyperspace`) so there's no cloud
-cost while developing. To plug in a different provider — OpenAI, Anthropic, Gemini, a local
-model, anything — you write one adapter; no other code changes.
+To add a provider: copy [`backend/app/llm/provider_template.py`](backend/app/llm/provider_template.py),
+implement the two methods, register it in [`factory.py`](backend/app/llm/factory.py), and set
+`LLM_PROVIDER` in `.env`. [`hyperspace.py`](backend/app/llm/hyperspace.py) is a worked example.
 
-**Steps to add a provider (e.g. `openai`):**
+## Related work — and how this differs
+- **RAG frameworks (LangChain, LlamaIndex):** provide retrieval + citation *plumbing*, but
+  "citation" means "this chunk was retrieved," not "this quoted span provably exists," and
+  they freely fabricate for out-of-corpus questions. Custom Guru verifies quotes and refuses
+  to blur grounded vs. extrapolated.
+- **Persona / character bots:** mimic *tone* (via fine-tuning/prompting) with no notion of
+  evidence or honesty. Here, groundedness and auditability are first-class.
+- **Prompt libraries (e.g. Fabric):** offer `extract_wisdom`-style prompts but no quote
+  verification, consolidation, or provenance contract.
+- **Techniques (Constitutional AI, Step-Back, rule induction):** methods, not a reusable tool
+  that emits an auditable principle set + a traceable reasoning path over your corpus.
 
-1. Copy [`backend/app/llm/provider_template.py`](backend/app/llm/provider_template.py) to a
-   new file, e.g. `backend/app/llm/openai_provider.py`.
-2. Implement `generate()` and `embed()` using your provider's API or SDK. Translate *to and
-   from* the neutral types in the signatures — the rest of the app only sees those.
-3. Register the class in [`backend/app/llm/factory.py`](backend/app/llm/factory.py):
-   ```python
-   _PROVIDERS = {
-       "hyperspace": HyperspaceProvider,
-       "openai": OpenAIProvider,   # <- your new adapter
-   }
-   ```
-4. Set `LLM_PROVIDER=openai` (and your keys) in `.env`. Done.
+The contribution here is the **combination + the design stance**: honesty and auditability as
+hard constraints, packaged as a reusable, persona-agnostic engine.
 
-[`hyperspace.py`](backend/app/llm/hyperspace.py) is a complete worked example to copy from.
+## Honest scope
+"Verified" means the **evidence is real and locatable** — *not* that the interpretation is
+provably correct. Principle induction and extrapolation remain the model's judgment; the
+mitigations are the inspectable artifacts, the grounded/extrapolated labelling, and the
+evaluation harness. We never claim to predict what a person "really" thinks.
 
-> Note: `LLMProvider` currently bundles chat **and** embeddings into one provider. If you
-> want chat from one vendor and embeddings from another, that split is planned for a later
-> version — for now a single adapter handles both.
+## Contributing & conduct
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ## License
-
-TBD (will be added before first public release).
+[MIT](LICENSE) © 2026 Gnaneshwar Adapa.
