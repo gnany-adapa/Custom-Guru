@@ -4,4 +4,5 @@ requests
 chromadb
 streamlit
 python-dotenv
+langfuse
 pytest

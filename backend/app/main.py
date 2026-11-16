@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from backend.app.chat.service import answer
 from backend.app.config import settings
+from backend.app import obs
 from backend.app.rag.retriever import VectorStoreNotFoundError
 
 app = FastAPI(title="Custom Guru", version="0.1.0")
@@ -37,7 +38,7 @@ def health() -> dict:
 def chat(req: ChatRequest) -> dict:
     """Answer a question as the configured persona, grounded in their transcripts."""
     try:
-        return answer(req.question)
+        result = answer(req.question)
     except VectorStoreNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except requests.RequestException as exc:
@@ -45,3 +46,5 @@ def chat(req: ChatRequest) -> dict:
             status_code=503,
             detail="LLM provider unavailable. Is the Hyperspace proxy running?",
         ) from exc
+    obs.flush()  # no-op unless Langfuse is configured
+    return result

@@ -35,5 +35,15 @@ class Settings:
     top_k: int = int(_get("TOP_K", "4"))
     similarity_threshold: float = float(_get("SIMILARITY_THRESHOLD", "0.75"))
 
+    # Langfuse observability (optional — the app runs fine without it).
+    langfuse_public_key: str = _get("LANGFUSE_PUBLIC_KEY", "")
+    langfuse_secret_key: str = _get("LANGFUSE_SECRET_KEY", "")
+    # Langfuse's UI emits LANGFUSE_BASE_URL; its SDK wants LANGFUSE_HOST — accept either.
+    langfuse_host: str = _get("LANGFUSE_HOST", "") or _get("LANGFUSE_BASE_URL", "http://localhost:3000")
+
+    @property
+    def langfuse_enabled(self) -> bool:
+        return bool(self.langfuse_public_key and self.langfuse_secret_key)
+
 
 settings = Settings()

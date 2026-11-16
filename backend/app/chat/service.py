@@ -6,6 +6,7 @@ import re
 from backend.app.config import settings
 from backend.app.llm.base import LLMProvider
 from backend.app.llm.factory import get_provider
+from backend.app.obs import observe, update_trace
 from backend.app.persona.prompts import build_fallback_prompt, build_system_prompt
 from backend.app.rag.retriever import retrieve
 
@@ -43,6 +44,7 @@ def _apply_citations(answer_text: str, hits: list[dict]) -> tuple[str, list[dict
     return cleaned, citations
 
 
+@observe(name="chat.answer")
 def answer(
     question: str,
     top_k: int | None = None,
@@ -72,6 +74,15 @@ def answer(
     )
 
     grounded = bool(hits) and hits[0]["distance"] <= threshold
+    update_trace(
+        metadata={
+            "grounded": grounded,
+            "threshold": threshold,
+            "retrieved": [
+                {"source": h["source"], "distance": round(h["distance"], 3)} for h in hits
+            ],
+        }
+    )
     if grounded:
         reply = provider.generate(
             messages=[{"role": "user", "content": question}],
