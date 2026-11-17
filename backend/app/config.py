@@ -33,7 +33,12 @@ class Settings:
     transcripts_dir: str = _get("TRANSCRIPTS_DIR", "data/personas/hormozi/transcripts")
     chroma_dir: str = _get("CHROMA_DIR", "data/chroma")
     top_k: int = int(_get("TOP_K", "4"))
-    similarity_threshold: float = float(_get("SIMILARITY_THRESHOLD", "0.75"))
+    # Max cosine distance for the nearest chunk to count as "covered" (grounded path).
+    # PROVISIONAL at 2-transcript scale: measured covered questions land ~0.56, in-domain
+    # questions he hasn't covered ~0.60-0.73, off-topic ~0.89. 0.58 sits in the gap so the
+    # uncovered-but-in-domain ones fall through to the reasoning path instead of grounding
+    # and then declining. Re-calibrate from the eval harness as transcripts are added.
+    similarity_threshold: float = float(_get("SIMILARITY_THRESHOLD", "0.58"))
     # Max cosine distance for the nearest *principle* to be relevant enough to reason from.
     # Calibrated: novel on-domain questions land ~0.55-0.75; off-topic ~0.81+.
     reasoning_threshold: float = float(_get("REASONING_THRESHOLD", "0.78"))

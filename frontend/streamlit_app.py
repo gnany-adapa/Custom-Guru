@@ -19,8 +19,8 @@ PERSONA_NAME = "Alex Hormozi"
 PERSONA_INITIALS = "AH"
 GREETING = "What do you want to figure out?"
 SUBTITLE = (
-    "Ask Alex anything he's talked about. You'll get his actual thinking — "
-    "grounded in his own talks, never made up."
+    "Ask Alex anything. You'll get his actual words when he's covered it — "
+    "and clearly-labeled reasoning from his principles when he hasn't."
 )
 STARTERS = [
     "How should I price my offer?",
@@ -166,6 +166,20 @@ span.material-symbols-outlined,
 
 .cg-cite { font-size: .85rem; color: var(--muted); font-style: italic;
   border-left: 2px solid var(--line); padding-left: .7rem; margin: .15rem 0 .7rem; }
+.cg-cite span { font-style: normal; }
+
+/* ---------------- Reasoned extrapolation ---------------- */
+.cg-extrap {
+  display: inline-block; margin: 0 0 .65rem;
+  background: var(--gold-weak); color: var(--gold);
+  border: 1px solid #e7d3a8; border-radius: 999px;
+  padding: .3rem .75rem; font-size: .76rem; font-weight: 500; line-height: 1.3;
+}
+.cg-step { border-left: 2px solid var(--gold);
+  padding: .05rem 0 .05rem .7rem; margin: 0 0 .75rem; }
+.cg-step-factor { font-weight: 600; font-size: .9rem; color: var(--ink); }
+.cg-step-principle { font-size: .82rem; color: var(--muted); margin: .12rem 0; }
+.cg-step-inf { font-size: .88rem; color: var(--ink); }
 
 /* ---------------- Input pill ---------------- */
 [data-testid="stBottomBlockContainer"] { max-width: 760px; margin: 0 auto; }
@@ -205,7 +219,9 @@ def ask_backend(question: str) -> dict:
         data = r.json()
         return {
             "answer": data["answer"],
-            "citations": data.get("citations", []) if data.get("covered") else [],
+            "mode": data.get("mode", "grounded"),
+            "citations": data.get("citations", []),
+            "trace": data.get("trace", []),
         }
     except requests.RequestException as exc:
         return {
@@ -213,7 +229,9 @@ def ask_backend(question: str) -> dict:
                 f"Can't reach the backend at `{BACKEND_URL}`. "
                 f"Start it with `uvicorn backend.app.main:app`, then try again.\n\n`{exc}`"
             ),
+            "mode": "fallback",
             "citations": [],
+            "trace": [],
         }
 
 
@@ -255,18 +273,60 @@ with st.sidebar:
     )
 
 
-def render_message(role: str, content: str, citations: list[dict] | None = None) -> None:
+def _render_sources(citations: list[dict]) -> None:
+    """Grounded citations: numbered transcript excerpts the answer quoted."""
+    with st.expander(f"Sources ({len(citations)})"):
+        for c in citations:
+            st.markdown(f"**[{c['n']}]**  `{c['source']}`")
+            st.markdown(f'<div class="cg-cite">{c["excerpt"]}</div>', unsafe_allow_html=True)
+
+
+def _render_principles(citations: list[dict]) -> None:
+    """Reasoned citations: the principles the extrapolation was built from."""
+    with st.expander(f"Principles behind this ({len(citations)})"):
+        for c in citations:
+            st.markdown(f"**{c.get('name', '')}** — {c.get('principle', '')}")
+            if c.get("quote"):
+                src = f' <span>— {c["source"]}</span>' if c.get("source") else ""
+                st.markdown(
+                    f'<div class="cg-cite">“{c["quote"]}”{src}</div>',
+                    unsafe_allow_html=True,
+                )
+
+
+def render_message(
+    role: str,
+    content: str,
+    citations: list[dict] | None = None,
+    mode: str = "grounded",
+    trace: list[dict] | None = None,
+) -> None:
     avatar = "🧠" if role == "assistant" else "🧑"
+    reasoned = role == "assistant" and mode == "reasoned"
     with st.chat_message(role, avatar=avatar):
+        if reasoned:
+            st.markdown(
+                f'<div class="cg-extrap">⚗ Reasoned extrapolation — not something '
+                f"{PERSONA_NAME} said directly. Worked out from his principles.</div>",
+                unsafe_allow_html=True,
+            )
         st.markdown(content)
-        if citations:
-            with st.expander(f"Sources ({len(citations)})"):
-                for c in citations:
-                    st.markdown(f"**[{c['n']}]**  `{c['source']}`")
+        if reasoned and trace:
+            with st.expander(f"How he'd reason to this ({len(trace)} steps)"):
+                for step in trace:
                     st.markdown(
-                        f'<div class="cg-cite">{c["excerpt"]}</div>',
+                        '<div class="cg-step">'
+                        f'<div class="cg-step-factor">{step.get("factor", "")}</div>'
+                        f'<div class="cg-step-principle">↳ applies <b>{step.get("principle_name", "")}</b></div>'
+                        f'<div class="cg-step-inf">{step.get("inference", "")}</div>'
+                        "</div>",
                         unsafe_allow_html=True,
                     )
+        if citations:
+            if reasoned:
+                _render_principles(citations)
+            else:
+                _render_sources(citations)
 
 
 # --------------------------------------------------------------------------- main
@@ -291,7 +351,13 @@ if show_greeting:
 
 # Replay the conversation so far.
 for msg in st.session_state.messages:
-    render_message(msg["role"], msg["content"], msg.get("citations"))
+    render_message(
+        msg["role"],
+        msg["content"],
+        msg.get("citations"),
+        msg.get("mode", "grounded"),
+        msg.get("trace"),
+    )
 
 # Handle a new question (from the input box or a starter chip).
 if prompt:
@@ -299,9 +365,17 @@ if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.spinner("Thinking…"):
         result = ask_backend(prompt)
-    render_message("assistant", result["answer"], result["citations"])
+    render_message(
+        "assistant", result["answer"], result["citations"], result["mode"], result["trace"]
+    )
     st.session_state.messages.append(
-        {"role": "assistant", "content": result["answer"], "citations": result["citations"]}
+        {
+            "role": "assistant",
+            "content": result["answer"],
+            "citations": result["citations"],
+            "mode": result["mode"],
+            "trace": result["trace"],
+        }
     )
     if show_greeting:
         st.rerun()
