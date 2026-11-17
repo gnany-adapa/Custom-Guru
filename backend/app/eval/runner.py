@@ -23,15 +23,20 @@ def load_questions(path: str | None = None) -> list[dict]:
         return json.load(fh)["questions"]
 
 
-def behavior_ok(kind: str, covered: bool) -> bool | None:
-    """Did the system do the expected thing for this question kind?
+def behavior_ok(kind: str, mode: str) -> bool | None:
+    """Did the router do the expected thing for this question kind?
 
-    Returns None for kinds we don't score behaviorally (e.g. small talk).
+    Scored on the routing `mode`, since the whole point is the 3-way split:
+    covered questions should ground in his words, novel ones should be labeled
+    extrapolation, off-topic ones should decline. Returns None for kinds we
+    don't score behaviorally (e.g. small talk).
     """
     if kind == "off_topic":
-        return covered is False  # should decline
-    if kind in ("covered", "novel"):
-        return covered is True  # should answer/ground (novel: eventually via reasoning)
+        return mode == "fallback"  # should decline
+    if kind == "covered":
+        return mode == "grounded"  # answer from his actual words
+    if kind == "novel":
+        return mode == "reasoned"  # extrapolate from principles, labeled as such
     return None
 
 
@@ -40,7 +45,7 @@ def aggregate(results: list[dict]) -> dict:
     for metric in _METRICS:
         vals = [r["scores"][metric] for r in results if r.get("scores") and metric in r["scores"]]
         agg[metric] = round(sum(vals) / len(vals), 2) if vals else None
-    checks = [behavior_ok(r["kind"], r["covered"]) for r in results]
+    checks = [behavior_ok(r["kind"], r["mode"]) for r in results]
     checks = [c for c in checks if c is not None]
     agg["behavior_pass_rate"] = round(sum(checks) / len(checks), 2) if checks else None
     agg["n"] = len(results)
@@ -64,6 +69,7 @@ def run_eval(
                 "kind": q["kind"],
                 "question": q["question"],
                 "covered": out.get("covered"),
+                "mode": out.get("mode", "grounded"),
                 "answer": out.get("answer", ""),
                 "scores": scores,
             }
@@ -81,8 +87,9 @@ if __name__ == "__main__":
     )
     for r in report["results"]:
         s = r["scores"]
-        ok = behavior_ok(r["kind"], r["covered"])
+        ok = behavior_ok(r["kind"], r["mode"])
         flag = {True: "ok", False: "MISS", None: "-"}[ok]
         print(
-            f"[{flag:4}] {r['kind']:10} g={s['groundedness']} v={s['voice']} t={s['transparency']}  {r['id']}"
+            f"[{flag:4}] {r['kind']:10} →{r['mode']:9} "
+            f"g={s['groundedness']} v={s['voice']} t={s['transparency']}  {r['id']}"
         )

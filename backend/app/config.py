@@ -34,11 +34,14 @@ class Settings:
     chroma_dir: str = _get("CHROMA_DIR", "data/chroma")
     top_k: int = int(_get("TOP_K", "4"))
     # Max cosine distance for the nearest chunk to count as "covered" (grounded path).
-    # PROVISIONAL at 2-transcript scale: measured covered questions land ~0.56, in-domain
-    # questions he hasn't covered ~0.60-0.73, off-topic ~0.89. 0.58 sits in the gap so the
-    # uncovered-but-in-domain ones fall through to the reasoning path instead of grounding
-    # and then declining. Re-calibrate from the eval harness as transcripts are added.
-    similarity_threshold: float = float(_get("SIMILARITY_THRESHOLD", "0.58"))
+    # Calibrated on the 12-question eval set (backend.app.eval.runner) at 2-transcript
+    # scale: covered questions land 0.48-0.58, novel (uncovered-but-in-domain) ones
+    # 0.55-0.68 — these OVERLAP, so no single threshold separates them perfectly. 0.60
+    # sits just above the covered cluster: grounds all 4 covered, routes 3/4 novel to
+    # reasoning (the 4th, at 0.545, falls inside the covered band). The real fix is more
+    # transcripts — denser coverage pulls covered hits nearer and opens the gap. Re-run
+    # the eval as data grows. (An env SIMILARITY_THRESHOLD overrides this default.)
+    similarity_threshold: float = float(_get("SIMILARITY_THRESHOLD", "0.60"))
     # Max cosine distance for the nearest *principle* to be relevant enough to reason from.
     # Calibrated: novel on-domain questions land ~0.55-0.75; off-topic ~0.81+.
     reasoning_threshold: float = float(_get("REASONING_THRESHOLD", "0.78"))
