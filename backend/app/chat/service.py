@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import re
 
+from backend.app.chat.reasoning import reason_from_principles
 from backend.app.config import settings
 from backend.app.llm.base import LLMProvider
 from backend.app.llm.factory import get_provider
 from backend.app.obs import observe, update_trace
 from backend.app.persona.prompts import build_fallback_prompt, build_system_prompt
-from backend.app.rag.retriever import retrieve
+from backend.app.rag.retriever import retrieve, retrieve_principles
 
 _CITE_RE = re.compile(r"\[(\d+)\]")
 _EXCERPT_CHARS = 180
@@ -90,12 +91,25 @@ def answer(
             max_tokens=max_tokens,
         )
         answer_text, citations = _apply_citations(reply, hits)
-        return {"answer": answer_text, "covered": True, "citations": citations}
+        return {
+            "answer": answer_text, "covered": True, "mode": "grounded",
+            "citations": citations, "trace": [],
+        }
 
-    # No relevant material: let the model greet small talk or decline, via the fallback.
+    # Not directly covered — try reasoning from the persona's principles before declining.
+    persona = collection_name or settings.persona
+    principles = retrieve_principles(
+        question, chroma_dir=chroma_dir, persona=persona, provider=provider
+    )
+    if principles and principles[0]["distance"] <= settings.reasoning_threshold:
+        update_trace(metadata={"mode": "reasoned", "principles": [p["id"] for p in principles[:3]]})
+        # Nearest chunks give the model the persona's voice, even if beyond the grounding bar.
+        return reason_from_principles(question, principles, hits[:2], provider)
+
+    # Nothing relevant even among principles: greet small talk or decline.
     reply = provider.generate(
         messages=[{"role": "user", "content": question}],
         system=build_fallback_prompt(),
         max_tokens=300,
     )
-    return {"answer": reply, "covered": False, "citations": []}
+    return {"answer": reply, "covered": False, "mode": "fallback", "citations": [], "trace": []}

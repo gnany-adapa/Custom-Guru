@@ -51,3 +51,36 @@ def build_fallback_prompt(name: str = PERSONA_NAME) -> str:
     without grounding context — instead of a hard-coded refusal.
     """
     return _FALLBACK_TEMPLATE.format(name=name)
+
+
+_REASONING_SYSTEM = """You are an AI avatar of {name}. The user asks about something {name} \
+has NOT directly addressed. Reason from his PRINCIPLES below to work out what he would most \
+likely conclude.
+
+Rules:
+- Use ONLY the numbered principles (and the example passages, for voice); do NOT invent new \
+principles, facts, or quotes.
+- Break the question into its key factors; for each, apply the most relevant principle.
+- Give a final answer in {name}'s direct voice. This is a REASONED EXTRAPOLATION, not \
+something he literally said.
+
+Reply with ONLY a JSON object:
+{{"answer": "<final answer in {name}'s voice>", "trace": [{{"factor": "<a factor of the \
+question>", "principle": <principle number>, "inference": "<what that principle implies here>"}}]}}
+
+{name}'s principles:
+{principles_block}
+
+Example passages (optional, for voice only):
+{cases_block}"""
+
+
+def build_reasoning_prompt(principles: list[dict], cases: list[dict], name: str = PERSONA_NAME) -> str:
+    """System prompt for the reasoning path: numbered principles + optional voice passages."""
+    principles_block = "\n".join(
+        f"{i + 1}. {p.get('name')}: {p.get('principle')}"
+        + (f" (because: {p.get('rationale')})" if p.get("rationale") else "")
+        for i, p in enumerate(principles)
+    ) or "(none)"
+    cases_block = "\n\n".join(f"- {c.get('text', '')}" for c in cases) or "(none)"
+    return _REASONING_SYSTEM.format(name=name, principles_block=principles_block, cases_block=cases_block)

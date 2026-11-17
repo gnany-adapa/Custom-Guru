@@ -34,6 +34,9 @@ class Settings:
     chroma_dir: str = _get("CHROMA_DIR", "data/chroma")
     top_k: int = int(_get("TOP_K", "4"))
     similarity_threshold: float = float(_get("SIMILARITY_THRESHOLD", "0.75"))
+    # Max cosine distance for the nearest *principle* to be relevant enough to reason from.
+    # Calibrated: novel on-domain questions land ~0.55-0.75; off-topic ~0.81+.
+    reasoning_threshold: float = float(_get("REASONING_THRESHOLD", "0.78"))
 
     # Langfuse observability (optional — the app runs fine without it).
     langfuse_public_key: str = _get("LANGFUSE_PUBLIC_KEY", "")

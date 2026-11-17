@@ -59,19 +59,47 @@ def test_fallback_has_no_citations(monkeypatch):
     monkeypatch.setattr(
         service, "retrieve", lambda *a, **k: [{"text": "x", "source": "a.txt", "distance": 0.95}]
     )
+    monkeypatch.setattr(service, "retrieve_principles", lambda *a, **k: [])  # no principles → decline
     fp = _FakeProvider("Hey, what do you want to work on?")
 
     result = answer("hi", provider=fp, threshold=0.75)
 
     assert result["covered"] is False
+    assert result["mode"] == "fallback"
     assert result["citations"] == []
 
 
 def test_no_hits_is_fallback(monkeypatch):
     monkeypatch.setattr(service, "retrieve", lambda *a, **k: [])
+    monkeypatch.setattr(service, "retrieve_principles", lambda *a, **k: [])
     fp = _FakeProvider("hello")
 
     result = answer("anything", provider=fp, threshold=0.75)
 
     assert result["covered"] is False
+    assert result["mode"] == "fallback"
     assert result["citations"] == []
+
+
+def test_reasoning_branch_when_principles_relevant(monkeypatch):
+    # Not grounded (far chunk), but a relevant principle exists → reason from it.
+    monkeypatch.setattr(
+        service, "retrieve", lambda *a, **k: [{"text": "ctx", "source": "a.txt", "distance": 0.95}]
+    )
+    principles = [
+        {"id": "price-ladder", "name": "Price is a ladder", "principle": "Start low, raise.",
+         "rationale": "", "scope": "", "confidence": 0.9,
+         "quotes": [{"text": "easy up, hard down", "source": "m.txt"}], "distance": 0.50},
+    ]
+    monkeypatch.setattr(service, "retrieve_principles", lambda *a, **k: principles)
+    fp = _FakeProvider(
+        '{"answer":"Raise it, add value.","trace":[{"factor":"new offer","principle":1,"inference":"start low then climb"}]}'
+    )
+
+    result = answer("should I launch a $5/mo app?", provider=fp, threshold=0.75)
+
+    assert result["mode"] == "reasoned"
+    assert result["covered"] is False
+    assert len(result["trace"]) == 1
+    assert result["trace"][0]["principle_id"] == "price-ladder"
+    assert {c["name"] for c in result["citations"]} == {"Price is a ladder"}
