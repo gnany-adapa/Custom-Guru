@@ -28,9 +28,15 @@ class Settings:
     hyperspace_llm_model: str = _get("HYPERSPACE_LLM_MODEL", "claude-sonnet-4-6")
     hyperspace_embed_model: str = _get("HYPERSPACE_EMBED_MODEL", "text-embedding-3-large")
 
-    # Persona + RAG.
-    persona: str = _get("PERSONA", "hormozi")
-    transcripts_dir: str = _get("TRANSCRIPTS_DIR", "data/personas/hormozi/transcripts")
+    # Persona + RAG. The public demo ships persona-neutral: identity is config-driven
+    # with generic defaults, and no persona data is included. Point these at your own
+    # corpus and set the display identity below (e.g. in a local, gitignored .env).
+    persona: str = _get("PERSONA", "example")
+    transcripts_dir: str = _get("TRANSCRIPTS_DIR", "data/personas/example/transcripts")
+    # Display identity shown in the UI and used in prompts. Neutral by default.
+    persona_name: str = _get("PERSONA_NAME", "Example Mentor")
+    persona_initials: str = _get("PERSONA_INITIALS", "EM")
+    persona_role: str = _get("PERSONA_ROLE", "Grounded in their own words")
     chroma_dir: str = _get("CHROMA_DIR", "data/chroma")
     top_k: int = int(_get("TOP_K", "4"))
     # Max cosine distance for the nearest chunk to count as "covered" (grounded path).

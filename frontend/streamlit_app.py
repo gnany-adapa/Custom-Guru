@@ -15,12 +15,15 @@ import requests
 import streamlit as st
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
-PERSONA_NAME = "Alex Hormozi"
-PERSONA_INITIALS = "AH"
+# Neutral defaults; the backend's /health reports the configured persona identity and
+# overrides these at runtime, so the UI carries no hardcoded persona.
+PERSONA_NAME = "Example Mentor"
+PERSONA_INITIALS = "EM"
+PERSONA_ROLE = "Grounded in their own words"
 GREETING = "What do you want to figure out?"
 SUBTITLE = (
-    "Ask Alex anything. You'll get his actual words when he's covered it — "
-    "and clearly-labeled reasoning from his principles when he hasn't."
+    "Ask anything. You'll get their actual words when they've covered it — "
+    "and clearly-labeled reasoning from their principles when they haven't."
 )
 STARTERS = [
     "How should I price my offer?",
@@ -242,6 +245,11 @@ if "pending" not in st.session_state:
     st.session_state.pending = None
 
 health = get_health()
+# The backend is the single source of persona identity; follow it when reachable.
+if health:
+    PERSONA_NAME = health.get("persona_name") or PERSONA_NAME
+    PERSONA_INITIALS = health.get("persona_initials") or PERSONA_INITIALS
+    PERSONA_ROLE = health.get("persona_role") or PERSONA_ROLE
 
 # --------------------------------------------------------------------------- sidebar
 with st.sidebar:
@@ -259,7 +267,7 @@ with st.sidebar:
     st.markdown(
         f'<div class="cg-persona"><div class="cg-persona-avatar">{PERSONA_INITIALS}</div>'
         f'<div><div class="cg-persona-name">{PERSONA_NAME}</div>'
-        f'<div class="cg-persona-role">Grounded in his own talks</div></div></div>',
+        f'<div class="cg-persona-role">{PERSONA_ROLE}</div></div></div>',
         unsafe_allow_html=True,
     )
 
@@ -307,12 +315,12 @@ def render_message(
         if reasoned:
             st.markdown(
                 f'<div class="cg-extrap">⚗ Reasoned extrapolation — not something '
-                f"{PERSONA_NAME} said directly. Worked out from his principles.</div>",
+                f"{PERSONA_NAME} said directly. Worked out from their principles.</div>",
                 unsafe_allow_html=True,
             )
         st.markdown(content)
         if reasoned and trace:
-            with st.expander(f"How he'd reason to this ({len(trace)} steps)"):
+            with st.expander(f"How they'd reason to this ({len(trace)} steps)"):
                 for step in trace:
                     st.markdown(
                         '<div class="cg-step">'
@@ -330,7 +338,7 @@ def render_message(
 
 
 # --------------------------------------------------------------------------- main
-prompt = st.chat_input(f"Ask {PERSONA_NAME} anything he's covered…")
+prompt = st.chat_input(f"Ask {PERSONA_NAME} anything they've covered…")
 if st.session_state.pending and not prompt:
     prompt = st.session_state.pending
 st.session_state.pending = None

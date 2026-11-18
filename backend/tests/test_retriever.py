@@ -73,7 +73,7 @@ def _build_principle_store(tmp_path, provider):
          "quotes": [{"text": "a meeting destroys the whole block", "source": "time.txt"}]},
     ]
     col = chromadb.PersistentClient(path=str(tmp_path / "chroma")).get_or_create_collection(
-        "hormozi_principles", metadata={"hnsw:space": "cosine"})
+        "demo_principles", metadata={"hnsw:space": "cosine"})
     col.add(
         ids=[p["id"] for p in principles],
         embeddings=provider.embed([p["principle"] for p in principles]),
@@ -91,7 +91,7 @@ def test_retrieve_principles_returns_nearest_with_parsed_quotes(tmp_path):
 
     hits = retrieve_principles(
         "how should I set the price on my new offer?",
-        top_k=2, chroma_dir=str(tmp_path / "chroma"), persona="hormozi", provider=provider)
+        top_k=2, chroma_dir=str(tmp_path / "chroma"), persona="demo", provider=provider)
 
     assert len(hits) == 2
     assert hits[0]["id"] == "price-ladder"  # pricing question -> pricing principle first

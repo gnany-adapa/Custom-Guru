@@ -30,8 +30,15 @@ class ChatRequest(BaseModel):
 
 @app.get("/health")
 def health() -> dict:
-    """Liveness check. Reports which LLM provider is configured."""
-    return {"status": "ok", "provider": settings.llm_provider, "persona": settings.persona}
+    """Liveness check. Reports the configured provider and persona identity."""
+    return {
+        "status": "ok",
+        "provider": settings.llm_provider,
+        "persona": settings.persona,
+        "persona_name": settings.persona_name,
+        "persona_initials": settings.persona_initials,
+        "persona_role": settings.persona_role,
+    }
 
 
 @app.post("/chat")
