@@ -110,3 +110,35 @@ def test_malformed_json_is_safe_noop():
     out = critique("q", "original", PRINCIPLES, fp("not json"))
     assert out["checked"] is False and out["faithful"] is None
     assert out["answer"] == "original" and out["salvageable"] is True
+
+
+def test_claim_missing_key_does_not_raise():
+    """LLM returns a claim object without the 'claim' key — must not KeyError."""
+    from backend.app.chat.critic import critique
+
+    # 'claim' key is absent; only 'supported' and 'principle' are present.
+    reply = json.dumps(
+        {
+            "claims": [{"supported": False, "principle": None}],
+            "revised_answer": "",
+        }
+    )
+    out = critique("q", "original", PRINCIPLES, fp(reply))
+    # Should not raise; the missing-key claim is silently skipped (blank text filtered).
+    assert out["checked"] is True
+    assert out["flagged"] == []  # blank claim string was filtered out
+    assert out["salvageable"] is False  # 0 supported, empty revised
+
+
+def test_braces_in_question_and_answer_do_not_raise():
+    """User text containing literal { } must not blow up .format() in build_critic_prompt."""
+    from backend.app.chat.critic import critique
+
+    out = critique(
+        "set fee to {floor} or {ceiling}?",
+        'answer with {"json": "ish"} content',
+        PRINCIPLES,
+        fp(all_supported),
+    )
+    # Simply must not raise; correctness of the result is a bonus.
+    assert out["checked"] is True

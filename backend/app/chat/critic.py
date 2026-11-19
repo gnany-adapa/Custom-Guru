@@ -67,9 +67,11 @@ def critique(
         claims = []
 
     flagged: list[str] = [
-        str(c["claim"])
+        text
         for c in claims
         if isinstance(c, dict) and not c.get("supported")
+        for text in (str(c.get("claim", "")),)
+        if text  # skip blank claim strings so we don't flag empty noise
     ]
     supported_count: int = sum(
         1 for c in claims if isinstance(c, dict) and c.get("supported")

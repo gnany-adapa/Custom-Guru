@@ -124,9 +124,12 @@ def build_critic_prompt(
         f"{i + 1}. {p.get('name')}: {p.get('principle')}"
         for i, p in enumerate(principles)
     ) or "(none)"
+    # Escape literal braces in caller-supplied text so .format() doesn't misinterpret them.
+    safe_question = question.replace("{", "{{").replace("}", "}}")
+    safe_answer = answer.replace("{", "{{").replace("}", "}}")
     return _CRITIC_SYSTEM.format(
         name=name,
-        question=question,
-        answer=answer,
+        question=safe_question,
+        answer=safe_answer,
         principles_block=principles_block,
     )
