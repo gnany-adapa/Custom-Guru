@@ -222,6 +222,7 @@ def test_unsalvageable_reasoned_answer_declines_but_stays_reasoned(monkeypatch):
     result = answer("should I raise my price?", provider=fp, threshold=0.75)
 
     assert result["mode"] == "reasoned"  # NOT fallback — routing was correct
+    assert result["covered"] is False
     assert result["critique"]["declined"] is True
     assert result["critique"]["faithful"] is False
     assert result["answer"] == service._CRITIC_DECLINE
@@ -236,6 +237,35 @@ def test_critic_disabled_leaves_answer_unchanged(monkeypatch):
     result = answer("q", provider=fp, threshold=0.75, critic=False)
 
     assert result["critique"] == {"checked": False, "faithful": None, "flagged": [], "declined": False}
+
+
+def test_all_claims_supported_does_not_swap_answer(monkeypatch):
+    """When critic returns flagged=[] (all claims supported), the original reasoned answer is kept.
+
+    The revised critic answer ("SOMETHING ELSE") must NOT replace the original even though
+    the salvageable branch ran — an empty flagged list means nothing needed to change.
+    """
+    fp = _FakeProvider(_REASONING_REPLY)
+    _stub_reasoned(monkeypatch, fp)
+    monkeypatch.setattr(
+        service,
+        "critique",
+        lambda q, a, p, prov, **kw: {
+            "checked": True,
+            "faithful": True,
+            "flagged": [],
+            "answer": "SOMETHING ELSE",
+            "salvageable": True,
+        },
+    )
+
+    result = answer("should I raise my price?", provider=fp, threshold=0.75)
+
+    # The original reasoned answer must be delivered unchanged.
+    assert result["answer"] == "Raise it, add value."
+    assert result["answer"] != "SOMETHING ELSE"
+    assert result["critique"]["flagged"] == []
+    assert result["critique"]["declined"] is False
 
 
 def test_grounded_and_fallback_carry_uniform_critique_default(monkeypatch):

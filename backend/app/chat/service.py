@@ -15,7 +15,9 @@ from backend.app.rag.retriever import retrieve, retrieve_principles
 _CITE_RE = re.compile(r"\[(\d+)\]")
 _EXCERPT_CHARS = 180
 
-_DEFAULT_CRITIQUE: dict = {"checked": False, "faithful": None, "flagged": [], "declined": False}
+def _default_critique() -> dict:
+    """Return a fresh default critique dict with an independent flagged list each call."""
+    return {"checked": False, "faithful": None, "flagged": [], "declined": False}
 
 _CRITIC_DECLINE = (
     f"I can't stand behind a confident answer to that one. "
@@ -115,7 +117,7 @@ def answer(
         answer_text, citations = _apply_citations(reply, hits)
         return {
             "answer": answer_text, "covered": True, "mode": "grounded",
-            "citations": citations, "trace": [], "critique": dict(_DEFAULT_CRITIQUE),
+            "citations": citations, "trace": [], "critique": _default_critique(),
         }
 
     # Not directly covered — try reasoning from the persona's principles before declining.
@@ -132,7 +134,7 @@ def answer(
             c = critique(question, result["answer"], principles, provider)
             if not c["checked"]:
                 # Critic produced unparseable output → safe no-op, keep original answer.
-                result["critique"] = dict(_DEFAULT_CRITIQUE)
+                result["critique"] = _default_critique()
             elif not c["salvageable"]:
                 # Too many unsupported claims — honest decline, but routing was correct.
                 return {
@@ -149,7 +151,13 @@ def answer(
                     },
                 }
             else:
-                result["answer"] = c["answer"]
+                # Only replace the answer when claims were actually flagged; when all claims
+                # are supported (flagged=[]) the original reasoned answer is kept verbatim.
+                if c["flagged"]:
+                    result["answer"] = c["answer"]
+                # Note: critique["faithful"] reflects the original draft, not the possibly-revised
+                # delivered answer. citations and trace are intentionally left un-refiltered after
+                # a revision — they still correctly describe the reasoning that produced the draft.
                 result["critique"] = {
                     "checked": True,
                     "faithful": c["faithful"],
@@ -157,7 +165,7 @@ def answer(
                     "declined": False,
                 }
         else:
-            result["critique"] = dict(_DEFAULT_CRITIQUE)
+            result["critique"] = _default_critique()
 
         return result
 
@@ -167,4 +175,4 @@ def answer(
         system=build_fallback_prompt(),
         max_tokens=300,
     )
-    return {"answer": reply, "covered": False, "mode": "fallback", "citations": [], "trace": [], "critique": dict(_DEFAULT_CRITIQUE)}
+    return {"answer": reply, "covered": False, "mode": "fallback", "citations": [], "trace": [], "critique": _default_critique()}

@@ -350,7 +350,7 @@ def render_message(
             if flagged:
                 with st.expander(f"What the critic flagged ({len(flagged)})"):
                     for claim in flagged:
-                        st.markdown(f"- {claim}")
+                        st.markdown(f"- `{claim}`")
         if citations:
             if reasoned:
                 _render_principles(citations)
