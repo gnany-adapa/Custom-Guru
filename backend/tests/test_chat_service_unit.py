@@ -96,7 +96,7 @@ def test_reasoning_branch_when_principles_relevant(monkeypatch):
         '{"answer":"Raise it, add value.","trace":[{"factor":"new offer","principle":1,"inference":"start low then climb"}]}'
     )
 
-    result = answer("should I launch a $5/mo app?", provider=fp, threshold=0.75)
+    result = answer("should I launch a $5/mo app?", provider=fp, threshold=0.75, critic=False)
 
     assert result["mode"] == "reasoned"
     assert result["covered"] is False
@@ -126,3 +126,132 @@ def test_reasoning_threshold_is_overridable_per_call(monkeypatch):
     # Bar above it → reason from the principle.
     lenient = answer("q", provider=fp, threshold=0.75, reasoning_threshold=0.60)
     assert lenient["mode"] == "reasoned"
+
+
+# ---------------------------------------------------------------------------
+# Faithfulness critic wiring tests (Task 2)
+# ---------------------------------------------------------------------------
+
+_PRINCIPLES = [
+    {
+        "id": "price-ladder",
+        "name": "Price is a ladder",
+        "principle": "Start low, raise.",
+        "rationale": "",
+        "scope": "",
+        "confidence": 0.9,
+        "quotes": [{"text": "easy up, hard down", "source": "m.txt"}],
+        "distance": 0.50,
+    }
+]
+_FAR_HIT = [{"text": "ctx", "source": "a.txt", "distance": 0.95}]
+_REASONING_REPLY = (
+    '{"answer":"Raise it, add value.",'
+    '"trace":[{"factor":"new offer","principle":1,"inference":"start low then climb"}]}'
+)
+_REVISED_TEXT = "Raise it carefully."
+
+
+def _stub_reasoned(monkeypatch, fp):
+    """Shared setup for reasoned-path tests."""
+    monkeypatch.setattr(service, "retrieve", lambda *a, **k: _FAR_HIT)
+    monkeypatch.setattr(service, "retrieve_principles", lambda *a, **k: _PRINCIPLES)
+
+
+def test_reasoned_result_carries_critique(monkeypatch):
+    """Critic finds all claims supported → faithful, not declined, answer kept as-is."""
+    fp = _FakeProvider(_REASONING_REPLY)
+    _stub_reasoned(monkeypatch, fp)
+    monkeypatch.setattr(
+        service,
+        "critique",
+        lambda q, a, p, prov, **kw: {
+            "checked": True,
+            "faithful": True,
+            "flagged": [],
+            "answer": "Raise it, add value.",
+            "salvageable": True,
+        },
+    )
+
+    result = answer("should I raise my price?", provider=fp, threshold=0.75)
+
+    assert result["mode"] == "reasoned"
+    assert result["critique"] == {"checked": True, "faithful": True, "flagged": [], "declined": False}
+
+
+def test_unsupported_claim_is_revised_in_reasoned_answer(monkeypatch):
+    """Critic flags a claim but answer is salvageable → revised text, not declined."""
+    fp = _FakeProvider(_REASONING_REPLY)
+    _stub_reasoned(monkeypatch, fp)
+    monkeypatch.setattr(
+        service,
+        "critique",
+        lambda q, a, p, prov, **kw: {
+            "checked": True,
+            "faithful": False,
+            "flagged": ["some unsupported claim"],
+            "answer": _REVISED_TEXT,
+            "salvageable": True,
+        },
+    )
+
+    result = answer("should I raise my price?", provider=fp, threshold=0.75)
+
+    assert result["critique"]["flagged"]  # non-empty
+    assert result["critique"]["declined"] is False
+    assert result["answer"] == _REVISED_TEXT
+
+
+def test_unsalvageable_reasoned_answer_declines_but_stays_reasoned(monkeypatch):
+    """Critic marks unsalvageable → mode stays 'reasoned', answer replaced, trace/citations cleared."""
+    fp = _FakeProvider(_REASONING_REPLY)
+    _stub_reasoned(monkeypatch, fp)
+    monkeypatch.setattr(
+        service,
+        "critique",
+        lambda q, a, p, prov, **kw: {
+            "checked": True,
+            "faithful": False,
+            "flagged": ["bad claim 1", "bad claim 2"],
+            "answer": "original",
+            "salvageable": False,
+        },
+    )
+
+    result = answer("should I raise my price?", provider=fp, threshold=0.75)
+
+    assert result["mode"] == "reasoned"  # NOT fallback — routing was correct
+    assert result["critique"]["declined"] is True
+    assert result["critique"]["faithful"] is False
+    assert result["answer"] == service._CRITIC_DECLINE
+    assert result["citations"] == [] and result["trace"] == []
+
+
+def test_critic_disabled_leaves_answer_unchanged(monkeypatch):
+    """Passing critic=False keeps the reasoned answer and attaches the default no-op critique."""
+    fp = _FakeProvider(_REASONING_REPLY)
+    _stub_reasoned(monkeypatch, fp)
+
+    result = answer("q", provider=fp, threshold=0.75, critic=False)
+
+    assert result["critique"] == {"checked": False, "faithful": None, "flagged": [], "declined": False}
+
+
+def test_grounded_and_fallback_carry_uniform_critique_default(monkeypatch):
+    """Both grounded and fallback paths attach the default (checked=False) critique dict."""
+    # Grounded path
+    hits = [{"text": "value advice", "source": "a.txt", "distance": 0.20}]
+    monkeypatch.setattr(service, "retrieve", lambda *a, **k: hits)
+    fp = _FakeProvider("Value answer.")
+    grounded = answer("how?", provider=fp, threshold=0.75)
+
+    # Fallback path
+    monkeypatch.setattr(
+        service, "retrieve", lambda *a, **k: [{"text": "x", "source": "a.txt", "distance": 0.95}]
+    )
+    monkeypatch.setattr(service, "retrieve_principles", lambda *a, **k: [])
+    fallback = answer("hi", provider=fp, threshold=0.75)
+
+    assert grounded["critique"]["checked"] is False
+    assert fallback["critique"]["checked"] is False

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 
+from backend.app.chat.critic import critique
 from backend.app.chat.reasoning import reason_from_principles
 from backend.app.config import settings
 from backend.app.llm.base import LLMProvider
@@ -13,6 +14,15 @@ from backend.app.rag.retriever import retrieve, retrieve_principles
 
 _CITE_RE = re.compile(r"\[(\d+)\]")
 _EXCERPT_CHARS = 180
+
+_DEFAULT_CRITIQUE: dict = {"checked": False, "faithful": None, "flagged": [], "declined": False}
+
+_CRITIC_DECLINE = (
+    f"I can't stand behind a confident answer to that one. "
+    f"The principles I draw from — {settings.persona_name}'s recorded thinking — "
+    f"don't give me enough solid footing to support what I'd need to say. "
+    f"I'd rather be honest about that than give you something I can't back up."
+)
 
 
 def _excerpt(text: str, limit: int = _EXCERPT_CHARS) -> str:
@@ -55,6 +65,7 @@ def answer(
     chroma_dir: str | None = None,
     collection_name: str | None = None,
     max_tokens: int = 800,
+    critic: bool | None = None,
 ) -> dict:
     """Answer `question` as the persona, grounded in retrieved transcript chunks.
 
@@ -63,17 +74,20 @@ def answer(
     warmly or decline a genuine off-topic question — without inventing advice.
 
     Returns {"answer": str, "covered": bool, "mode": str, "citations": list[dict],
-    "trace": list[dict]}. `mode` is one of "grounded" | "reasoned" | "fallback".
-    Grounded answers carry citations of {"n": int, "source": str, "excerpt": str} and an
-    empty `trace`; reasoned answers carry a premise→principle→conclusion `trace` and
-    principle-based citations (see reason_from_principles); fallback answers have empty
-    `citations` and `trace`.
+    "trace": list[dict], "critique": dict}. `mode` is one of "grounded" | "reasoned" |
+    "fallback". Grounded answers carry citations of {"n": int, "source": str,
+    "excerpt": str} and an empty `trace`; reasoned answers carry a
+    premise→principle→conclusion `trace` and principle-based citations (see
+    reason_from_principles); fallback answers have empty `citations` and `trace`.
+    `critique` is {"checked": bool, "faithful": bool | None, "flagged": list[str],
+    "declined": bool} — only populated on the reasoned path when critic is enabled.
     """
     provider = provider or get_provider()
     threshold = settings.similarity_threshold if threshold is None else threshold
     reasoning_threshold = (
         settings.reasoning_threshold if reasoning_threshold is None else reasoning_threshold
     )
+    critic = settings.critic_enabled if critic is None else critic
     hits = retrieve(
         question,
         top_k=top_k,
@@ -101,7 +115,7 @@ def answer(
         answer_text, citations = _apply_citations(reply, hits)
         return {
             "answer": answer_text, "covered": True, "mode": "grounded",
-            "citations": citations, "trace": [],
+            "citations": citations, "trace": [], "critique": dict(_DEFAULT_CRITIQUE),
         }
 
     # Not directly covered — try reasoning from the persona's principles before declining.
@@ -112,7 +126,40 @@ def answer(
     if principles and principles[0]["distance"] <= reasoning_threshold:
         update_trace(metadata={"mode": "reasoned", "principles": [p["id"] for p in principles[:3]]})
         # Nearest chunks give the model the persona's voice, even if beyond the grounding bar.
-        return reason_from_principles(question, principles, hits[:2], provider)
+        result = reason_from_principles(question, principles, hits[:2], provider)
+
+        if critic:
+            c = critique(question, result["answer"], principles, provider)
+            if not c["checked"]:
+                # Critic produced unparseable output → safe no-op, keep original answer.
+                result["critique"] = dict(_DEFAULT_CRITIQUE)
+            elif not c["salvageable"]:
+                # Too many unsupported claims — honest decline, but routing was correct.
+                return {
+                    "answer": _CRITIC_DECLINE,
+                    "covered": False,
+                    "mode": "reasoned",
+                    "trace": [],
+                    "citations": [],
+                    "critique": {
+                        "checked": True,
+                        "faithful": False,
+                        "flagged": c["flagged"],
+                        "declined": True,
+                    },
+                }
+            else:
+                result["answer"] = c["answer"]
+                result["critique"] = {
+                    "checked": True,
+                    "faithful": c["faithful"],
+                    "flagged": c["flagged"],
+                    "declined": False,
+                }
+        else:
+            result["critique"] = dict(_DEFAULT_CRITIQUE)
+
+        return result
 
     # Nothing relevant even among principles: greet small talk or decline.
     reply = provider.generate(
@@ -120,4 +167,4 @@ def answer(
         system=build_fallback_prompt(),
         max_tokens=300,
     )
-    return {"answer": reply, "covered": False, "mode": "fallback", "citations": [], "trace": []}
+    return {"answer": reply, "covered": False, "mode": "fallback", "citations": [], "trace": [], "critique": dict(_DEFAULT_CRITIQUE)}
