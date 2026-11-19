@@ -27,7 +27,7 @@ def test_chat_request_rejects_blank_and_overlong():
 
 def test_chat_maps_missing_vector_store_to_503(monkeypatch):
     def boom(_q):
-        raise VectorStoreNotFoundError("Vector store 'hormozi' not found. Run ingest.")
+        raise VectorStoreNotFoundError("Vector store 'demo' not found. Run ingest.")
 
     monkeypatch.setattr(main_module, "answer", boom)
     r = client.post("/chat", json={"question": "hello"})

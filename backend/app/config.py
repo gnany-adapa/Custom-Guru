@@ -28,12 +28,29 @@ class Settings:
     hyperspace_llm_model: str = _get("HYPERSPACE_LLM_MODEL", "claude-sonnet-4-6")
     hyperspace_embed_model: str = _get("HYPERSPACE_EMBED_MODEL", "text-embedding-3-large")
 
-    # Persona + RAG.
-    persona: str = _get("PERSONA", "hormozi")
-    transcripts_dir: str = _get("TRANSCRIPTS_DIR", "data/personas/hormozi/transcripts")
+    # Persona + RAG. The public demo ships persona-neutral: identity is config-driven
+    # with generic defaults, and no persona data is included. Point these at your own
+    # corpus and set the display identity below (e.g. in a local, gitignored .env).
+    persona: str = _get("PERSONA", "example")
+    transcripts_dir: str = _get("TRANSCRIPTS_DIR", "data/personas/example/transcripts")
+    # Display identity shown in the UI and used in prompts. Neutral by default.
+    persona_name: str = _get("PERSONA_NAME", "Example Mentor")
+    persona_initials: str = _get("PERSONA_INITIALS", "EM")
+    persona_role: str = _get("PERSONA_ROLE", "Grounded in their own words")
     chroma_dir: str = _get("CHROMA_DIR", "data/chroma")
     top_k: int = int(_get("TOP_K", "4"))
-    similarity_threshold: float = float(_get("SIMILARITY_THRESHOLD", "0.75"))
+    # Max cosine distance for the nearest chunk to count as "covered" (grounded path).
+    # Calibrated on the 12-question eval set (backend.app.eval.runner) at 2-transcript
+    # scale: covered questions land 0.48-0.58, novel (uncovered-but-in-domain) ones
+    # 0.55-0.68 — these OVERLAP, so no single threshold separates them perfectly. 0.60
+    # sits just above the covered cluster: grounds all 4 covered, routes 3/4 novel to
+    # reasoning (the 4th, at 0.545, falls inside the covered band). The real fix is more
+    # transcripts — denser coverage pulls covered hits nearer and opens the gap. Re-run
+    # the eval as data grows. (An env SIMILARITY_THRESHOLD overrides this default.)
+    similarity_threshold: float = float(_get("SIMILARITY_THRESHOLD", "0.60"))
+    # Max cosine distance for the nearest *principle* to be relevant enough to reason from.
+    # Calibrated: novel on-domain questions land ~0.55-0.75; off-topic ~0.81+.
+    reasoning_threshold: float = float(_get("REASONING_THRESHOLD", "0.78"))
 
     # Langfuse observability (optional — the app runs fine without it).
     langfuse_public_key: str = _get("LANGFUSE_PUBLIC_KEY", "")

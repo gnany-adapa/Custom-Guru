@@ -11,7 +11,7 @@
     { "id": "nov-saas-lifetime-deal", "kind": "novel", "question": "Should a early-stage SaaS startup offer a lifetime deal to get traction?" },
     { "id": "off-carbonara", "kind": "off_topic", "question": "What's a good recipe for pasta carbonara?" },
     { "id": "off-sprained-ankle", "kind": "off_topic", "question": "How do I treat a sprained ankle at home?" },
-    { "id": "small-greeting", "kind": "small_talk", "question": "Hey Alex, how's it going?" },
+    { "id": "small-greeting", "kind": "small_talk", "question": "Hey, how's it going?" },
     { "id": "small-identity", "kind": "small_talk", "question": "Who are you?" }
   ]
 }

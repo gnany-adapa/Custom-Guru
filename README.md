@@ -26,14 +26,17 @@ the engine ships with **zero persona data**.
 
 ## Status (honest)
 **Available now:** grounded Q&A in the persona's voice · verified inline citations ·
-principle-extraction pipeline (map → consolidate → compress) · honest fallback for
-out-of-corpus questions · an evaluation harness (groundedness / voice / transparency) ·
+principle-extraction pipeline (map → consolidate → compress) · the **principle-based
+reasoning engine** — questions the person never addressed are answered by applying the
+extracted principles through a visible **factor → principle → inference** trace, labelled as
+extrapolation and never passed off as a real quote · honest fallback for out-of-corpus
+questions · an evaluation harness (groundedness / voice / transparency + routing accuracy) ·
 optional Langfuse tracing · a Streamlit demo UI.
 
-**In progress (the headline):** the **principle-based reasoning engine** — answering novel
-questions by applying the extracted principles with a visible, source-traceable trace and a
-critic that checks faithfulness. This is the active area of work; today the system *grounds
-or honestly declines*, and the reasoning layer is being built on top of the principle store.
+**In progress:** a **faithfulness critic** that checks each reasoned answer against the
+principles it cites and drops unsupported claims; and denser, more diverse corpora — the
+single biggest quality lever, since grounded vs. novel retrieval distances overlap at small
+corpus sizes.
 
 ## Architecture
 ```
@@ -96,6 +99,13 @@ hard constraints, packaged as a reusable, persona-agnostic engine.
 provably correct. Principle induction and extrapolation remain the model's judgment; the
 mitigations are the inspectable artifacts, the grounded/extrapolated labelling, and the
 evaluation harness. We never claim to predict what a person "really" thinks.
+
+## Responsible use
+The demo ships **persona-neutral** and includes **no persona's data**. If you configure it
+with a real person's words, you are responsible for having the right to use that content, and
+for making clear to anyone using it that this is an **unofficial AI avatar** — not the
+person, and not affiliated with or endorsed by them. Keep your corpus private; the repo
+gitignores `data/` so it is never committed.
 
 ## Contributing & conduct
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).

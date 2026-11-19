@@ -7,17 +7,19 @@ from backend.app.llm.base import LLMProvider, Message
 
 
 def test_behavior_ok_by_kind():
-    assert behavior_ok("off_topic", covered=False) is True
-    assert behavior_ok("off_topic", covered=True) is False
-    assert behavior_ok("covered", covered=True) is True
-    assert behavior_ok("novel", covered=False) is False
-    assert behavior_ok("small_talk", covered=True) is None  # not scored
+    assert behavior_ok("off_topic", "fallback") is True
+    assert behavior_ok("off_topic", "grounded") is False
+    assert behavior_ok("covered", "grounded") is True
+    assert behavior_ok("covered", "reasoned") is False
+    assert behavior_ok("novel", "reasoned") is True
+    assert behavior_ok("novel", "grounded") is False
+    assert behavior_ok("small_talk", "grounded") is None  # not scored
 
 
 def test_aggregate_means_and_pass_rate():
     results = [
-        {"kind": "covered", "covered": True, "scores": {"groundedness": 4, "voice": 2, "transparency": 4}},
-        {"kind": "novel", "covered": True, "scores": {"groundedness": 2, "voice": 4, "transparency": 2}},
+        {"kind": "covered", "mode": "grounded", "scores": {"groundedness": 4, "voice": 2, "transparency": 4}},
+        {"kind": "novel", "mode": "reasoned", "scores": {"groundedness": 2, "voice": 4, "transparency": 2}},
     ]
     agg = aggregate(results)
     assert agg["groundedness"] == 3.0
@@ -34,7 +36,7 @@ def test_run_eval_with_fakes():
     ]
 
     def fake_answer(q):
-        return {"answer": "A", "covered": q == "q1", "citations": []}
+        return {"answer": "A", "mode": "grounded" if q == "q1" else "fallback", "citations": []}
 
     def fake_judge(question, answer, citations, provider):
         return {"groundedness": 4, "voice": 4, "transparency": 4}
@@ -42,7 +44,7 @@ def test_run_eval_with_fakes():
     report = run_eval(fake_answer, fake_judge, questions=qs, provider=None)
     assert len(report["results"]) == 2
     assert report["aggregates"]["groundedness"] == 4.0
-    assert report["aggregates"]["behavior_pass_rate"] == 1.0  # covered→True, off_topic→False both correct
+    assert report["aggregates"]["behavior_pass_rate"] == 1.0  # covered→grounded, off_topic→fallback
 
 
 class _FakeJudgeProvider(LLMProvider):
