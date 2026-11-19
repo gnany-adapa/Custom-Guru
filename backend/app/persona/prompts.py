@@ -1,14 +1,12 @@
 """Persona prompt construction.
 
-The persona's display name is config-driven (`PERSONA_NAME`), so the engine is
+The persona's display name is config-driven (`settings.persona_name`), so the engine is
 persona-neutral: the system prompt pins the model to the persona's voice AND to the
 retrieved excerpts, so answers stay grounded in their actual words.
 """
 from __future__ import annotations
 
 from backend.app.config import settings
-
-PERSONA_NAME = settings.persona_name
 
 _SYSTEM_TEMPLATE = """You are an AI avatar of {name}. You answer as {name}, in the first \
 person, in their direct, practical, no-fluff style.
@@ -28,8 +26,9 @@ or refer to "the excerpts" — just answer as them.
 {context}"""
 
 
-def build_system_prompt(chunks: list[dict], name: str = PERSONA_NAME) -> str:
+def build_system_prompt(chunks: list[dict], name: str | None = None) -> str:
     """Assemble the grounded system prompt from retrieved chunks."""
+    name = name or settings.persona_name
     context = "\n\n".join(f"[{i + 1}] {c['text']}" for i, c in enumerate(chunks))
     return _SYSTEM_TEMPLATE.format(name=name, context=context)
 
@@ -46,12 +45,13 @@ haven't really covered that — and do NOT invent advice, frameworks, numbers, o
 Keep it short. Don't mention being an AI or refer to "material"."""
 
 
-def build_fallback_prompt(name: str = PERSONA_NAME) -> str:
+def build_fallback_prompt(name: str | None = None) -> str:
     """System prompt used when retrieval finds nothing relevant.
 
     Lets the model greet small talk warmly or decline a genuine off-topic question,
     without grounding context — instead of a hard-coded refusal.
     """
+    name = name or settings.persona_name
     return _FALLBACK_TEMPLATE.format(name=name)
 
 
@@ -77,8 +77,9 @@ Example passages (optional, for voice only):
 {cases_block}"""
 
 
-def build_reasoning_prompt(principles: list[dict], cases: list[dict], name: str = PERSONA_NAME) -> str:
+def build_reasoning_prompt(principles: list[dict], cases: list[dict], name: str | None = None) -> str:
     """System prompt for the reasoning path: numbered principles + optional voice passages."""
+    name = name or settings.persona_name
     principles_block = "\n".join(
         f"{i + 1}. {p.get('name')}: {p.get('principle')}"
         + (f" (because: {p.get('rationale')})" if p.get("rationale") else "")

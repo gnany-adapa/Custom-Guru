@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import json
+import logging
 
 import chromadb
 
 from backend.app.config import settings
 from backend.app.llm.base import LLMProvider
 from backend.app.llm.factory import get_provider
+
+logger = logging.getLogger(__name__)
 
 
 class VectorStoreNotFoundError(RuntimeError):
@@ -80,6 +83,11 @@ def retrieve_principles(
     try:
         col = client.get_collection(f"{persona}_principles")
     except Exception:
+        logger.debug(
+            "Principle store '%s_principles' unavailable; skipping reasoning path.",
+            persona,
+            exc_info=True,
+        )
         return []
 
     query_vec = provider.embed([query])[0]

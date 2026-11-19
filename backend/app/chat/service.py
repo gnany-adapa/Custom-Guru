@@ -50,6 +50,7 @@ def answer(
     question: str,
     top_k: int | None = None,
     threshold: float | None = None,
+    reasoning_threshold: float | None = None,
     provider: LLMProvider | None = None,
     chroma_dir: str | None = None,
     collection_name: str | None = None,
@@ -61,11 +62,18 @@ def answer(
     relevant material: the model is given a fallback prompt so it can greet small talk
     warmly or decline a genuine off-topic question — without inventing advice.
 
-    Returns {"answer": str, "covered": bool, "citations": list[dict]} where each citation
-    is {"n": int, "source": str, "excerpt": str}.
+    Returns {"answer": str, "covered": bool, "mode": str, "citations": list[dict],
+    "trace": list[dict]}. `mode` is one of "grounded" | "reasoned" | "fallback".
+    Grounded answers carry citations of {"n": int, "source": str, "excerpt": str} and an
+    empty `trace`; reasoned answers carry a premise→principle→conclusion `trace` and
+    principle-based citations (see reason_from_principles); fallback answers have empty
+    `citations` and `trace`.
     """
     provider = provider or get_provider()
     threshold = settings.similarity_threshold if threshold is None else threshold
+    reasoning_threshold = (
+        settings.reasoning_threshold if reasoning_threshold is None else reasoning_threshold
+    )
     hits = retrieve(
         question,
         top_k=top_k,
@@ -101,7 +109,7 @@ def answer(
     principles = retrieve_principles(
         question, chroma_dir=chroma_dir, persona=persona, provider=provider
     )
-    if principles and principles[0]["distance"] <= settings.reasoning_threshold:
+    if principles and principles[0]["distance"] <= reasoning_threshold:
         update_trace(metadata={"mode": "reasoned", "principles": [p["id"] for p in principles[:3]]})
         # Nearest chunks give the model the persona's voice, even if beyond the grounding bar.
         return reason_from_principles(question, principles, hits[:2], provider)
