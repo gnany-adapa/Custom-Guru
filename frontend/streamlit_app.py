@@ -184,6 +184,14 @@ span.material-symbols-outlined,
 .cg-step-principle { font-size: .82rem; color: var(--muted); margin: .12rem 0; }
 .cg-step-inf { font-size: .88rem; color: var(--ink); }
 
+/* ---------------- Faithfulness badge ---------------- */
+.cg-faithful {
+  display: inline-block; margin: .4rem 0 .65rem;
+  background: #e8f5e9; color: #2e7d32;
+  border: 1px solid #a5d6a7; border-radius: 999px;
+  padding: .3rem .75rem; font-size: .76rem; font-weight: 500; line-height: 1.3;
+}
+
 /* ---------------- Input pill ---------------- */
 [data-testid="stBottomBlockContainer"] { max-width: 760px; margin: 0 auto; }
 [data-testid="stChatInput"] {
@@ -225,6 +233,7 @@ def ask_backend(question: str) -> dict:
             "mode": data.get("mode", "grounded"),
             "citations": data.get("citations", []),
             "trace": data.get("trace", []),
+            "critique": data.get("critique", {}),
         }
     except requests.RequestException as exc:
         return {
@@ -235,6 +244,7 @@ def ask_backend(question: str) -> dict:
             "mode": "fallback",
             "citations": [],
             "trace": [],
+            "critique": {},
         }
 
 
@@ -308,6 +318,7 @@ def render_message(
     citations: list[dict] | None = None,
     mode: str = "grounded",
     trace: list[dict] | None = None,
+    critique: dict | None = None,
 ) -> None:
     avatar = "🧠" if role == "assistant" else "🧑"
     reasoned = role == "assistant" and mode == "reasoned"
@@ -330,6 +341,16 @@ def render_message(
                         "</div>",
                         unsafe_allow_html=True,
                     )
+        if reasoned and critique and critique.get("checked"):
+            st.markdown(
+                '<div class="cg-faithful">✓ Faithfulness-checked</div>',
+                unsafe_allow_html=True,
+            )
+            flagged = critique.get("flagged") or []
+            if flagged:
+                with st.expander(f"What the critic flagged ({len(flagged)})"):
+                    for claim in flagged:
+                        st.markdown(f"- {claim}")
         if citations:
             if reasoned:
                 _render_principles(citations)
@@ -365,6 +386,7 @@ for msg in st.session_state.messages:
         msg.get("citations"),
         msg.get("mode", "grounded"),
         msg.get("trace"),
+        msg.get("critique"),
     )
 
 # Handle a new question (from the input box or a starter chip).
@@ -374,7 +396,8 @@ if prompt:
     with st.spinner("Thinking…"):
         result = ask_backend(prompt)
     render_message(
-        "assistant", result["answer"], result["citations"], result["mode"], result["trace"]
+        "assistant", result["answer"], result["citations"], result["mode"], result["trace"],
+        result["critique"],
     )
     st.session_state.messages.append(
         {
@@ -383,6 +406,7 @@ if prompt:
             "citations": result["citations"],
             "mode": result["mode"],
             "trace": result["trace"],
+            "critique": result["critique"],
         }
     )
     if show_greeting:
