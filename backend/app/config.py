@@ -52,6 +52,9 @@ class Settings:
     # Calibrated: novel on-domain questions land ~0.55-0.75; off-topic ~0.81+.
     reasoning_threshold: float = float(_get("REASONING_THRESHOLD", "0.78"))
 
+    # Faithfulness critic: when enabled, reasoned answers are checked against principles.
+    critic_enabled: bool = _get("CRITIC_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
+
     # Langfuse observability (optional — the app runs fine without it).
     langfuse_public_key: str = _get("LANGFUSE_PUBLIC_KEY", "")
     langfuse_secret_key: str = _get("LANGFUSE_SECRET_KEY", "")

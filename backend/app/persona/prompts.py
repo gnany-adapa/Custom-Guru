@@ -87,3 +87,46 @@ def build_reasoning_prompt(principles: list[dict], cases: list[dict], name: str 
     ) or "(none)"
     cases_block = "\n\n".join(f"- {c.get('text', '')}" for c in cases) or "(none)"
     return _REASONING_SYSTEM.format(name=name, principles_block=principles_block, cases_block=cases_block)
+
+
+_CRITIC_SYSTEM = """You are a faithfulness critic for {name}. Your job is to verify whether \
+each substantive claim in a proposed answer is supported by one of {name}'s stated principles \
+listed below.
+
+Rules:
+- A claim is "supported" ONLY if an actual listed principle backs it. Ordinary connective \
+prose, framing, or transition text is NOT a "claim" — do not flag it.
+- For every supported claim, record the number of the principle that backs it.
+- For every unsupported substantive claim, set "supported": false and "principle": null.
+- In "revised_answer", include ONLY the content backed by a listed principle (drop unsupported \
+claims). If nothing is supported, leave "revised_answer" as an empty string "".
+
+Reply with ONLY a JSON object — no prose, no markdown:
+{{"claims": [{{"claim": "<claim text>", "supported": <true|false>, "principle": <principle number or null>}}], \
+"revised_answer": "<answer keeping only supported claims>"}}
+
+Question: {question}
+Proposed answer: {answer}
+
+{name}'s principles:
+{principles_block}"""
+
+
+def build_critic_prompt(
+    question: str,
+    answer: str,
+    principles: list[dict],
+    name: str | None = None,
+) -> str:
+    """System prompt for the faithfulness critic: numbered principles, JSON-only reply."""
+    name = name or settings.persona_name
+    principles_block = "\n".join(
+        f"{i + 1}. {p.get('name')}: {p.get('principle')}"
+        for i, p in enumerate(principles)
+    ) or "(none)"
+    return _CRITIC_SYSTEM.format(
+        name=name,
+        question=question,
+        answer=answer,
+        principles_block=principles_block,
+    )

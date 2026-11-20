@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from backend.app.eval.judge import judge_answer
-from backend.app.eval.runner import aggregate, behavior_ok, run_eval
+from backend.app.eval.runner import aggregate, behavior_ok, critique_counts, run_eval
 from backend.app.llm.base import LLMProvider, Message
 
 
@@ -64,3 +64,13 @@ def test_judge_answer_parses_scores():
     assert out["groundedness"] == 4
     assert out["voice"] == 5
     assert out["transparency"] == 3
+
+
+def test_critique_counts_classifies_reasoned_results():
+    results = [
+        {"mode": "reasoned", "critique": {"checked": False, "flagged": [], "declined": False}},
+        {"mode": "reasoned", "critique": {"checked": True, "flagged": ["x"], "declined": False}},
+        {"mode": "reasoned", "critique": {"checked": True, "flagged": ["y"], "declined": True}},
+        {"mode": "grounded", "critique": {"checked": False, "flagged": [], "declined": False}},
+    ]
+    assert critique_counts(results) == {"unchanged": 1, "revised": 1, "declined": 1}

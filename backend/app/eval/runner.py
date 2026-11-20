@@ -52,6 +52,26 @@ def aggregate(results: list[dict]) -> dict:
     return agg
 
 
+def critique_counts(results: list[dict]) -> dict:
+    """Classify reasoned results by their critic outcome.
+
+    Only reasoned-mode results are counted; grounded/fallback are ignored.
+    Returns {"unchanged": int, "revised": int, "declined": int}.
+    """
+    unchanged = revised = declined = 0
+    for r in results:
+        if r.get("mode") != "reasoned":
+            continue
+        c = r.get("critique", {})
+        if c.get("declined"):
+            declined += 1
+        elif c.get("flagged"):
+            revised += 1
+        else:
+            unchanged += 1
+    return {"unchanged": unchanged, "revised": revised, "declined": declined}
+
+
 def run_eval(
     answer_fn: Callable[[str], dict] = default_answer,
     judge_fn: Callable = default_judge,
@@ -72,24 +92,52 @@ def run_eval(
                 "mode": out.get("mode", "grounded"),
                 "answer": out.get("answer", ""),
                 "scores": scores,
+                "critique": out.get("critique", {"checked": False, "faithful": None, "flagged": [], "declined": False}),
             }
         )
     return {"results": results, "aggregates": aggregate(results)}
 
 
-if __name__ == "__main__":
-    report = run_eval(provider=get_provider())
-    agg = report["aggregates"]
-    print(f"\n=== Custom Guru eval — {agg['n']} questions ===")
-    print(
-        f"groundedness={agg['groundedness']}  voice={agg['voice']}  "
-        f"transparency={agg['transparency']}  behavior_pass_rate={agg['behavior_pass_rate']}\n"
+def compare_critic(
+    questions: list[dict] | None = None,
+    provider: LLMProvider | None = None,
+) -> dict:
+    """Run the eval twice — critic off then on — and return both aggregates plus counts.
+
+    Returns {"off": <aggregate>, "on": <aggregate>, "counts": <critique_counts on on-results>}.
+    """
+    off_report = run_eval(
+        answer_fn=lambda q: default_answer(q, critic=False),
+        provider=provider,
+        questions=questions,
     )
-    for r in report["results"]:
-        s = r["scores"]
-        ok = behavior_ok(r["kind"], r["mode"])
-        flag = {True: "ok", False: "MISS", None: "-"}[ok]
-        print(
-            f"[{flag:4}] {r['kind']:10} →{r['mode']:9} "
-            f"g={s['groundedness']} v={s['voice']} t={s['transparency']}  {r['id']}"
-        )
+    on_report = run_eval(
+        answer_fn=lambda q: default_answer(q, critic=True),
+        provider=provider,
+        questions=questions,
+    )
+    return {
+        "off": off_report["aggregates"],
+        "on": on_report["aggregates"],
+        "counts": critique_counts(on_report["results"]),
+    }
+
+
+if __name__ == "__main__":
+    provider = get_provider()
+    comparison = compare_critic(provider=provider)
+    off = comparison["off"]
+    on = comparison["on"]
+    counts = comparison["counts"]
+
+    print(f"\n=== Custom Guru eval — critic A/B ({on['n']} questions) ===")
+    print(f"{'metric':<20} {'critic OFF':>12} {'critic ON':>12}")
+    print("-" * 46)
+    print(f"{'groundedness':<20} {str(off['groundedness']):>12} {str(on['groundedness']):>12}")
+    print(f"{'transparency':<20} {str(off['transparency']):>12} {str(on['transparency']):>12}")
+    print(f"{'voice':<20} {str(off['voice']):>12} {str(on['voice']):>12}")
+    print(f"{'behavior_pass_rate':<20} {str(off['behavior_pass_rate']):>12} {str(on['behavior_pass_rate']):>12}")
+    print()
+    print(f"Reasoned answers (critic ON): "
+          f"unchanged={counts['unchanged']}  revised={counts['revised']}  declined={counts['declined']}")
+    print()
