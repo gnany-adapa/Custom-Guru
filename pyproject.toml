@@ -1,0 +1,36 @@
+# pyproject.toml
+#
+# Tool configuration only — this project is NOT pip-installable.
+# (No [build-system] or [project] sections.)
+#
+# Install runtime deps:  pip install -r requirements.txt
+# Install dev deps:      pip install -r requirements-dev.txt
+#
+# Lint + format: ruff check . --fix && ruff format .
+# Tests:         pytest
+
+# ---------------------------------------------------------------------------
+# Ruff — lint + format in one tool, replaces Flake8/Black/isort.
+#
+# Active rule sets (keep intentionally minimal for a small project):
+#   E  — pycodestyle errors (style + formatting correctness)
+#   F  — pyflakes (undefined names, unused imports, etc.)
+#   I  — isort (import order)
+#
+# To add more rule sets later (e.g. UP for pyupgrade), extend `select`.
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = [
+    "E501",  # line-too-long — ruff format handles wrapping; no need to also error
+]
+
+[tool.ruff.lint.per-file-ignores]
+"backend/tests/*" = ["F811"]  # pytest fixtures can shadow outer-scope names
+
+# Pytest configuration lives in pytest.ini (single source of truth) — intentionally
+# NOT duplicated here, to avoid pytest loading config from two places.

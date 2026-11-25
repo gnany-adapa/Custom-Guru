@@ -1,8 +1,7 @@
-fastapi
-uvicorn[standard]
-requests
-chromadb
-streamlit
-python-dotenv
-langfuse
-pytest
+fastapi==0.143.3
+uvicorn[standard]==0.54.0
+requests==2.34.2
+chromadb==1.5.9
+streamlit==1.66.0
+python-dotenv==1.2.4
+langfuse==5.0.3

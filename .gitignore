@@ -30,3 +30,6 @@ env/
 .playwright-mcp/
 customguru-v1-demo.png
 cg-*.png
+
+# --- Audit / scratch (not for review) ---
+/draft/
