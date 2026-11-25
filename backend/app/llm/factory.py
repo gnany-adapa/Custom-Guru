@@ -8,10 +8,11 @@ from __future__ import annotations
 from backend.app.config import settings
 from backend.app.llm.base import LLMProvider
 from backend.app.llm.hyperspace import HyperspaceProvider
+from backend.app.llm.openai_provider import OpenAIProvider
 
 _PROVIDERS: dict[str, type[LLMProvider]] = {
     "hyperspace": HyperspaceProvider,
-    # "openai": OpenAIProvider,   # add in a later version
+    "openai": OpenAIProvider,
     # "claude": ClaudeProvider,
 }
 
