@@ -1,10 +1,13 @@
 """Tests for the chat service: retrieve context, then answer grounded in it."""
 from __future__ import annotations
 
+import pytest
+
 from backend.app.chat.service import answer
 from backend.app.rag.ingest import ingest
 
 
+@pytest.mark.live
 def test_answer_covered_question_is_grounded(tmp_path):
     tdir = tmp_path / "transcripts"
     tdir.mkdir()

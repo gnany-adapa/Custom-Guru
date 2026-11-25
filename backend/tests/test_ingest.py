@@ -31,6 +31,7 @@ def test_chunk_text_short_input_single_chunk():
     assert chunks == ["just a few words here"]
 
 
+@pytest.mark.live
 def test_ingest_builds_persistent_collection(tmp_path):
     tdir = tmp_path / "transcripts"
     tdir.mkdir()

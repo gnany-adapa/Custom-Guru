@@ -29,14 +29,13 @@ the engine ships with **zero persona data**.
 principle-extraction pipeline (map → consolidate → compress) · the **principle-based
 reasoning engine** — questions the person never addressed are answered by applying the
 extracted principles through a visible **factor → principle → inference** trace, labelled as
-extrapolation and never passed off as a real quote · honest fallback for out-of-corpus
-questions · an evaluation harness (groundedness / voice / transparency + routing accuracy) ·
-optional Langfuse tracing · a Streamlit demo UI.
+extrapolation and never passed off as a real quote · **faithfulness critic** — checks each
+reasoned answer against the principles it cites and flags unsupported claims · honest fallback
+for out-of-corpus questions · an evaluation harness (groundedness / voice / transparency +
+routing accuracy) · optional Langfuse tracing · a Streamlit demo UI.
 
-**In progress:** a **faithfulness critic** that checks each reasoned answer against the
-principles it cites and drops unsupported claims; and denser, more diverse corpora — the
-single biggest quality lever, since grounded vs. novel retrieval distances overlap at small
-corpus sizes.
+**In progress:** denser, more diverse corpora — the single biggest quality lever, since
+grounded vs. novel retrieval distances overlap at small corpus sizes.
 
 ## Architecture
 ```
@@ -51,15 +50,25 @@ Streamlit UI ──HTTP──▶ FastAPI backend
 ```
 
 ## Quick start
+
+> **Don't have the Hyperspace proxy?** Set `LLM_PROVIDER=openai` (or `claude`) in `.env` —
+> see [Using a different LLM provider](#using-a-different-llm-provider) below.
+> You can also run all offline tests first (zero LLM access needed): `pytest -m "not live"`.
+
 ```bash
-pip install -r requirements.txt
-cp .env.example .env            # fill in your LLM provider keys
+pip install -r requirements.txt -r requirements-dev.txt
+cp .env.example .env            # fill in your LLM provider keys — see the file for options
 # drop plain-text source files into data/personas/<name>/transcripts/
-python -m backend.app.rag.ingest       # build the retrieval store
+python -m backend.app.rag.ingest       # build the retrieval store  (needs LLM for embeddings)
 python -m backend.app.rag.principles   # distill the principle set (principles.json)
 uvicorn backend.app.main:app --reload  # start the API
 streamlit run frontend/streamlit_app.py
 ```
+
+> **No corpus yet?** The app won't return answers until you ingest at least one transcript.
+> Drop any `.txt` file (a few hundred words is enough to verify the pipeline) into
+> `data/personas/example/transcripts/` before running the two pipeline steps above.
+> The offline tests (`pytest -m "not live"`) work without any corpus.
 
 ## Bring your own corpus
 Place plain-text files under `data/personas/<name>/transcripts/` (gitignored — your data is
@@ -67,6 +76,7 @@ never committed), set `PERSONA` in `.env`, and re-run the two pipeline steps abo
 ships with no persona's content.
 
 ## Using a different LLM provider
+
 The app never calls a vendor SDK directly — it depends on one small interface,
 `LLMProvider` ([`backend/app/llm/base.py`](backend/app/llm/base.py)):
 
@@ -75,9 +85,24 @@ def generate(self, messages, system=None, max_tokens=1000) -> str   # chat compl
 def embed(self, texts) -> list[list[float]]                         # embeddings
 ```
 
-To add a provider: copy [`backend/app/llm/provider_template.py`](backend/app/llm/provider_template.py),
-implement the two methods, register it in [`factory.py`](backend/app/llm/factory.py), and set
-`LLM_PROVIDER` in `.env`. [`hyperspace.py`](backend/app/llm/hyperspace.py) is a worked example.
+**Built-in providers:**
+| `LLM_PROVIDER` value | Description | Key env vars |
+|---|---|---|
+| `hyperspace` (default) | Local proxy at `localhost:6655` | `HYPERSPACE_API_KEY`, `HYPERSPACE_LLM_MODEL`, `HYPERSPACE_EMBED_MODEL` |
+| `openai` | OpenAI API (GPT-4o / text-embedding-3) | `OPENAI_API_KEY`, `OPENAI_LLM_MODEL`, `OPENAI_EMBED_MODEL` |
+
+> An OpenAI provider adapter is available in `draft/openai_provider.py`. Copy it to
+> `backend/app/llm/openai_provider.py`, register it in `factory.py` (four-line change —
+> see the file header for exact instructions), and add the env vars below to `.env`.
+
+**To add any other provider:** copy [`backend/app/llm/provider_template.py`](backend/app/llm/provider_template.py),
+implement the two methods, register it in [`factory.py`](backend/app/llm/factory.py), and
+set `LLM_PROVIDER` in `.env`. [`hyperspace.py`](backend/app/llm/hyperspace.py) is a full
+worked example.
+
+**Important when switching models:** embedding models are not interchangeable.
+If you change `*_EMBED_MODEL`, delete `data/chroma/` and re-run `ingest` — mixing
+models in the same vector store produces silent semantic garbage.
 
 ## Related work — and how this differs
 - **RAG frameworks (LangChain, LlamaIndex):** provide retrieval + citation *plumbing*, but

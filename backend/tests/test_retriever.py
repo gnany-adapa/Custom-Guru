@@ -28,6 +28,7 @@ def test_retrieve_missing_collection_raises_clear_error(tmp_path):
         )
 
 
+@pytest.mark.live
 def test_retrieve_returns_nearest_chunks_first(tmp_path):
     tdir = tmp_path / "transcripts"
     tdir.mkdir()
@@ -84,6 +85,7 @@ def _build_principle_store(tmp_path, provider):
     )
 
 
+@pytest.mark.live
 def test_retrieve_principles_returns_nearest_with_parsed_quotes(tmp_path):
     from backend.app.llm.factory import get_provider
     provider = get_provider()

@@ -28,6 +28,12 @@ class Settings:
     hyperspace_llm_model: str = _get("HYPERSPACE_LLM_MODEL", "claude-sonnet-4-6")
     hyperspace_embed_model: str = _get("HYPERSPACE_EMBED_MODEL", "text-embedding-3-large")
 
+    # OpenAI API (alternative to Hyperspace; set LLM_PROVIDER=openai to activate).
+    openai_api_key: str = _get("OPENAI_API_KEY", "")
+    openai_base_url: str = _get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    openai_llm_model: str = _get("OPENAI_LLM_MODEL", "gpt-4o")
+    openai_embed_model: str = _get("OPENAI_EMBED_MODEL", "text-embedding-3-large")
+
     # Persona + RAG. The public demo ships persona-neutral: identity is config-driven
     # with generic defaults, and no persona data is included. Point these at your own
     # corpus and set the display identity below (e.g. in a local, gitignored .env).
