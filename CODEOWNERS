@@ -1,0 +1,19 @@
+# CODEOWNERS
+#
+# Any PR touching these security-sensitive paths requires a review from the
+# maintainer before it can be merged. GitHub enforces this automatically when
+# branch protection requires a "Code Owner" review on main.
+#
+# Syntax: <path pattern>  <owner> [<owner> ...]
+# Patterns follow .gitignore glob rules; more-specific entries override earlier ones.
+
+# GitHub Actions workflows — a compromised workflow can exfiltrate secrets or
+# poison the build environment for every contributor.
+/.github/                   @gnany-adapa
+
+# LLM routing layer — controls which model is called and with what parameters;
+# also the most likely place for prompt-injection or data-exfiltration paths.
+/backend/app/llm/           @gnany-adapa
+
+# App configuration — API keys, feature flags, and environment settings live here.
+/backend/app/config.py      @gnany-adapa

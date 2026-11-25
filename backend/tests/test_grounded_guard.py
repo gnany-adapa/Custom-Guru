@@ -6,6 +6,8 @@ letting the model greet small talk warmly or decline a genuine off-topic questio
 """
 from __future__ import annotations
 
+import pytest
+
 from backend.app.chat.service import answer
 from backend.app.llm.base import LLMProvider, Message
 from backend.app.llm.factory import get_provider
@@ -29,6 +31,7 @@ class _FallbackSpyProvider(LLMProvider):
         return self._real.embed(texts)
 
 
+@pytest.mark.live
 def test_low_match_uses_fallback_llm_not_canned_refusal(tmp_path):
     tdir = tmp_path / "transcripts"
     tdir.mkdir()

@@ -6,9 +6,12 @@ numeric vectors.
 """
 from __future__ import annotations
 
+import pytest
+
 from backend.app.llm.factory import get_provider
 
 
+@pytest.mark.live
 def test_hyperspace_generate_returns_text():
     provider = get_provider()
     out = provider.generate(
@@ -20,6 +23,7 @@ def test_hyperspace_generate_returns_text():
     assert out.strip() != ""
 
 
+@pytest.mark.live
 def test_hyperspace_embed_returns_vectors():
     provider = get_provider()
     vecs = provider.embed(["hello world", "a second piece of text"])

@@ -1,0 +1,46 @@
+# .github/workflows/ci.yml
+#
+# Runs the offline test suite (no LLM proxy required) on every PR and push to main.
+# Tests that need a live provider are skipped here via -m "not live".
+#
+# SECURITY NOTES:
+# - `pull_request_target` is intentionally NOT used (forked PRs get a read-only
+#   token and no secrets — there is nothing here for a malicious PR to steal).
+# - Explicit least-privilege permissions block: only `contents: read` is granted.
+# - Actions are pinned to major-version tags (v4 / v5). For the strongest supply-chain
+#   guarantee, replace each tag with its full commit SHA from the action's release page.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least-privilege token: grant only what is strictly needed.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        # SHA-pin tip: replace @v4 with @<full-sha> for stronger supply-chain security.
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        # SHA-pin tip: replace @v5 with @<full-sha> for stronger supply-chain security.
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        # requirements-dev.txt includes `-r requirements.txt` plus pytest (and ruff),
+        # which the test step below needs.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run offline tests
+        run: python -m pytest -m "not live" -v
