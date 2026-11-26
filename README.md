@@ -1,4 +1,4 @@
-# Custom Guru 
+# MindEcho 
 
 **An open-source engine for *grounded, auditable* AI personas — it answers *as* a person
 using their own recorded words, and is honest about the difference between what they
