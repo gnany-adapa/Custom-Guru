@@ -1,4 +1,4 @@
-# Custom Guru 
+# MindEcho
 
 **An open-source engine for *grounded, auditable* AI personas — it answers *as* a person
 using their own recorded words, and is honest about the difference between what they
@@ -6,7 +6,7 @@ actually said and what it's reasoning on their behalf.**
 
 Most "chat with X" / persona bots optimize for *sounding* like someone. They can't tell you
 what's a real quote versus an invention, and you can't inspect how they reached an answer.
-Custom Guru treats this as a **provenance and reasoning-transparency problem**: every claim
+MindEcho treats this as a **provenance and reasoning-transparency problem**: every claim
 is either tied to a **source quote that's been verified to actually exist**, or clearly
 **labelled as extrapolation** — never blurred. Bring your own corpus (talks, essays, docs);
 the engine ships with **zero persona data**.
@@ -107,7 +107,7 @@ models in the same vector store produces silent semantic garbage.
 ## Related work — and how this differs
 - **RAG frameworks (LangChain, LlamaIndex):** provide retrieval + citation *plumbing*, but
   "citation" means "this chunk was retrieved," not "this quoted span provably exists," and
-  they freely fabricate for out-of-corpus questions. Custom Guru verifies quotes and refuses
+  they freely fabricate for out-of-corpus questions. MindEcho verifies quotes and refuses
   to blur grounded vs. extrapolated.
 - **Persona / character bots:** mimic *tone* (via fine-tuning/prompting) with no notion of
   evidence or honesty. Here, groundedness and auditability are first-class.
@@ -136,4 +136,5 @@ gitignores `data/` so it is never committed.
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ## License
-[MIT](LICENSE) © 2026 Gnaneshwar Adapa.
+[MIT](LICENSE) © 2026 Gnaneshwar Adapa. This license covers the project's own code.
+Dependencies and other third-party materials retain their respective licenses.
